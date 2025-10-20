@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Conversion Status{% endblock %}
+
+{% block content %}
+<h1>Conversion Status</h1>
+
+{% if file_status.status == 'downloading' or file_status.status == 'converting' %}
+<div class="status">
+<p class="center"><strong>Processing...</strong></p>
+<p>{{ file_status.progress }}</p>
+<p class="center">Please wait 30-90 seconds</p>
+<p class="center">This page will NOT auto-refresh</p>
+</div>
+
+<form method="GET" action="/status/{{ file_id }}">
+<button type="submit">Refresh Status</button>
+</form>
+
+{% elif file_status.status == 'completed' %}
+<div class="success">
+<p class="center"><strong>&#x2713; Conversion Complete!</strong></p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<a href="/download/{{ file_id }}" class="button">Download 3GP File</a>
+
+<div class="info">
+<p><strong>Important:</strong></p>
+<ul>
+<li>Download will start immediately</li>
+<li>File stays available for 2 hours</li>
+<li>Works on slow 2G connections</li>
+<li>Play on your feature phone</li>
+</ul>
+</div>
+
+<hr>
+<a href="/" class="button">Convert Another Video</a>
+
+{% elif file_status.status == 'failed' %}
+<div class="error">
+<p class="center"><strong>Conversion Failed</strong></p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<a href="/" class="button">Try Again</a>
+
+<div class="info">
+<p><strong>Common issues:</strong></p>
+<ul>
+<li>Check if YouTube URL is correct</li>
+<li>Video may be age-restricted</li>
+<li>Video may be private or deleted</li>
+<li>Try a different video</li>
+</ul>
+</div>
+
+{% else %}
+<div class="error">
+<p class="center">Status unknown</p>
+<p>File not found or expired</p>
+</div>
+
+<a href="/" class="button">Go Home</a>
+{% endif %}
+
+{% endblock %}
