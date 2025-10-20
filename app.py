@@ -22,6 +22,11 @@ DOWNLOAD_FOLDER = '/tmp/downloads'
 STATUS_FILE = '/tmp/conversion_status.json'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
+MAX_VIDEO_DURATION = 6 * 3600
+DOWNLOAD_TIMEOUT = 1800
+CONVERSION_TIMEOUT = 3600
+FILE_RETENTION_HOURS = 2
+
 status_lock = threading.Lock()
 
 def get_status():
@@ -64,10 +69,26 @@ def update_status(file_id, updates):
 def generate_file_id(url):
     return hashlib.md5(url.encode()).hexdigest()[:12]
 
+def get_video_duration(file_path):
+    try:
+        cmd = [
+            'ffprobe',
+            '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            file_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            return float(result.stdout.strip())
+        return 0
+    except:
+        return 0
+
 def download_and_convert(url, file_id):
     update_status(file_id, {
         'status': 'downloading',
-        'progress': 'Downloading video from YouTube...',
+        'progress': 'Downloading video from YouTube... (this may take several minutes for long videos)',
         'url': url,
         'timestamp': datetime.now().isoformat()
     })
@@ -78,20 +99,35 @@ def download_and_convert(url, file_id):
     try:
         download_cmd = [
             'yt-dlp',
-            '-f', 'worstvideo[height>=144]+worstaudio/worst[height>=144]/worst/best',
+            '-f', 'worstvideo[height>=144][duration<=21600]+worstaudio/worst[height>=144][duration<=21600]/worst[duration<=21600]/best',
             '--merge-output-format', 'mp4',
             '-o', temp_video,
+            '--max-filesize', '2G',
             url
         ]
         
-        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
         
         if result.returncode != 0:
-            raise Exception(f"Download failed: {result.stderr}")
+            error_msg = result.stderr
+            if 'duration' in error_msg.lower():
+                raise Exception("Video exceeds 6-hour limit")
+            raise Exception(f"Download failed: {error_msg[:200]}")
+        
+        if not os.path.exists(temp_video):
+            raise Exception("Download failed: Video file not created")
+        
+        duration = get_video_duration(temp_video)
+        if duration > MAX_VIDEO_DURATION:
+            os.remove(temp_video)
+            raise Exception(f"Video is {duration/3600:.1f} hours long. Maximum allowed is 6 hours.")
+        
+        file_size = os.path.getsize(temp_video)
+        file_size_mb = file_size / (1024 * 1024)
         
         update_status(file_id, {
             'status': 'converting',
-            'progress': 'Converting to 3GP format (176x144)...'
+            'progress': f'Converting to 3GP format... Video: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Please wait, this may take several minutes.'
         })
         
         convert_cmd = [
@@ -109,39 +145,60 @@ def download_and_convert(url, file_id):
             output_path
         ]
         
-        result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=CONVERSION_TIMEOUT)
         
         if os.path.exists(temp_video):
-            os.remove(temp_video)
+            try:
+                os.remove(temp_video)
+            except:
+                pass
         
         if result.returncode != 0:
-            raise Exception(f"Conversion failed: {result.stderr}")
+            raise Exception(f"Conversion failed: {result.stderr[:200]}")
         
-        file_size = os.path.getsize(output_path)
-        file_size_mb = file_size / (1024 * 1024)
+        if not os.path.exists(output_path):
+            raise Exception("Conversion failed: Output file not created")
+        
+        final_size = os.path.getsize(output_path)
+        final_size_mb = final_size / (1024 * 1024)
         
         update_status(file_id, {
             'status': 'completed',
-            'progress': f'Conversion complete! File size: {file_size_mb:.2f} MB',
+            'progress': f'Conversion complete! Duration: {duration/60:.1f} min, File size: {final_size_mb:.2f} MB',
             'filename': f'{file_id}.3gp',
-            'file_size': file_size,
+            'file_size': final_size,
+            'duration': duration,
             'completed_at': datetime.now().isoformat()
         })
         
+    except subprocess.TimeoutExpired:
+        update_status(file_id, {
+            'status': 'failed',
+            'progress': 'Error: Processing timeout. Video may be too long or server is busy. Try a shorter video.'
+        })
+        if os.path.exists(temp_video):
+            try:
+                os.remove(temp_video)
+            except:
+                pass
     except Exception as e:
         update_status(file_id, {
             'status': 'failed',
             'progress': f'Error: {str(e)}'
         })
         if os.path.exists(temp_video):
-            os.remove(temp_video)
+            try:
+                os.remove(temp_video)
+            except:
+                pass
 
 def cleanup_old_files():
     while True:
         try:
             time.sleep(1800)
             
-            cutoff_time = datetime.now() - timedelta(hours=2)
+            cutoff_time = datetime.now() - timedelta(hours=FILE_RETENTION_HOURS)
+            deleted_count = 0
             
             with status_lock:
                 if os.path.exists(STATUS_FILE):
@@ -154,13 +211,27 @@ def cleanup_old_files():
                     status = {}
                 
                 for file_id, data in list(status.items()):
-                    if 'completed_at' in data:
-                        completed_time = datetime.fromisoformat(data['completed_at'])
-                        if completed_time < cutoff_time:
+                    try:
+                        should_delete = False
+                        
+                        if 'completed_at' in data:
+                            completed_time = datetime.fromisoformat(data['completed_at'])
+                            if completed_time < cutoff_time:
+                                should_delete = True
+                        elif 'timestamp' in data:
+                            start_time = datetime.fromisoformat(data['timestamp'])
+                            if start_time < cutoff_time and data.get('status') in ['failed', 'unknown']:
+                                should_delete = True
+                        
+                        if should_delete:
                             file_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
                             if os.path.exists(file_path):
                                 os.remove(file_path)
+                                deleted_count += 1
                             del status[file_id]
+                    except Exception as e:
+                        print(f"Error cleaning file {file_id}: {e}")
+                        continue
                 
                 temp_file = STATUS_FILE + '.tmp'
                 with open(temp_file, 'w') as f:
@@ -168,11 +239,19 @@ def cleanup_old_files():
                 os.replace(temp_file, STATUS_FILE)
             
             for filename in os.listdir(DOWNLOAD_FOLDER):
-                file_path = os.path.join(DOWNLOAD_FOLDER, filename)
-                if os.path.isfile(file_path):
-                    file_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-                    if file_time < cutoff_time:
-                        os.remove(file_path)
+                try:
+                    file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+                    if os.path.isfile(file_path):
+                        file_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                        if file_time < cutoff_time:
+                            os.remove(file_path)
+                            deleted_count += 1
+                except Exception as e:
+                    print(f"Error removing orphan file {filename}: {e}")
+                    continue
+            
+            if deleted_count > 0:
+                print(f"Cleanup completed: Deleted {deleted_count} old files")
                         
         except Exception as e:
             print(f"Cleanup error: {e}")
