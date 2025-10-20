@@ -13,11 +13,18 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-20**: Critical conversion fixes
+- Fixed yt-dlp format selection (YouTube API changes broke `-f worst`)
+- Improved FFmpeg conversion with proper aspect ratio handling (scale+pad filter)
+- Upgraded video codec from H.263 to MPEG-4 for better compatibility
+- Increased bitrates: 200kbps video, 12.2kbps audio for better quality
+- Fixed "Signature extraction failed" errors with robust format selector
+
 **2025-10-20**: Latest improvements
 - Added favicon route to eliminate 404 errors (returns 204 No Content)
 - Implemented Cache-Control headers for HTML responses to prevent stale status pages
 - Verified all functionality: no LSP errors, clean browser console
-- Confirmed FFmpeg 3GP/H.263 codec support
+- Confirmed FFmpeg 3GP/MPEG-4 codec support
 - Server tested and running smoothly
 
 **2025-10-20**: Initial implementation
@@ -52,15 +59,16 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 ```
 
 ### Video Conversion Settings
-- **Resolution**: 176x144 (perfect for Nokia feature phones)
+- **Resolution**: 176x144 (with proper aspect ratio padding)
 - **Format**: 3GP
-- **Video Codec**: H.263
-- **Video Bitrate**: 64kbps
+- **Video Codec**: MPEG-4 (more compatible than H.263)
+- **Video Bitrate**: 200kbps (better quality)
 - **Audio Codec**: AAC (feature phone compatible)
 - **Audio Sample Rate**: 8000 Hz
-- **Audio Bitrate**: 16kbps
+- **Audio Bitrate**: 12.2kbps
 - **Frame Rate**: 12 fps
-- **Result**: 3-5 minute video = ~2-3 MB
+- **Aspect Ratio**: Auto-scaled and padded to preserve original ratio
+- **Result**: 3-5 minute video = ~3-4 MB
 
 ### User Flow
 1. User pastes YouTube URL on homepage
