@@ -78,7 +78,8 @@ def download_and_convert(url, file_id):
     try:
         download_cmd = [
             'yt-dlp',
-            '-f', 'worst',
+            '-f', 'worstvideo[height>=144]+worstaudio/worst[height>=144]/worst/best',
+            '--merge-output-format', 'mp4',
             '-o', temp_video,
             url
         ]
@@ -96,15 +97,14 @@ def download_and_convert(url, file_id):
         convert_cmd = [
             'ffmpeg',
             '-i', temp_video,
-            '-s', '176x144',
+            '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
+            '-vcodec', 'mpeg4',
             '-r', '12',
-            '-vcodec', 'h263',
-            '-b:v', '64k',
+            '-b:v', '200k',
             '-acodec', 'aac',
             '-ar', '8000',
+            '-b:a', '12200',
             '-ac', '1',
-            '-b:a', '16k',
-            '-strict', 'experimental',
             '-y',
             output_path
         ]
