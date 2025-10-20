@@ -13,6 +13,13 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-20**: Latest improvements
+- Added favicon route to eliminate 404 errors (returns 204 No Content)
+- Implemented Cache-Control headers for HTML responses to prevent stale status pages
+- Verified all functionality: no LSP errors, clean browser console
+- Confirmed FFmpeg 3GP/H.263 codec support
+- Server tested and running smoothly
+
 **2025-10-20**: Initial implementation
 - Created Flask app with route handlers
 - Implemented yt-dlp + FFmpeg conversion pipeline
@@ -74,6 +81,7 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 
 ### Routes
 - `GET /` - Homepage with URL input form
+- `GET /favicon.ico` - Favicon route (returns 204 No Content)
 - `POST /convert` - Start video conversion
 - `GET /status/<file_id>` - Check conversion status
 - `GET /download/<file_id>` - Download converted 3GP file
