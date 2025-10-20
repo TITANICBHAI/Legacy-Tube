@@ -10,6 +10,14 @@ import hashlib
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-change-in-production')
 
+@app.after_request
+def add_cache_control_headers(response):
+    if response.content_type and 'text/html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 DOWNLOAD_FOLDER = '/tmp/downloads'
 STATUS_FILE = '/tmp/conversion_status.json'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
@@ -175,6 +183,10 @@ cleanup_thread.start()
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 @app.route('/convert', methods=['POST'])
 def convert():
