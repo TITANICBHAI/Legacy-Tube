@@ -22,10 +22,11 @@ DOWNLOAD_FOLDER = '/tmp/downloads'
 STATUS_FILE = '/tmp/conversion_status.json'
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-MAX_VIDEO_DURATION = 6 * 3600
-DOWNLOAD_TIMEOUT = 1800
-CONVERSION_TIMEOUT = 3600
-FILE_RETENTION_HOURS = 2
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 6 * 3600))
+DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
+CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
+FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 2))
+MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '4G')
 
 status_lock = threading.Lock()
 
@@ -67,7 +68,9 @@ def update_status(file_id, updates):
         os.replace(temp_file, STATUS_FILE)
 
 def generate_file_id(url):
-    return hashlib.md5(url.encode()).hexdigest()[:12]
+    timestamp = str(int(time.time() * 1000))
+    combined = f"{url}_{timestamp}"
+    return hashlib.md5(combined.encode()).hexdigest()[:16]
 
 def get_video_duration(file_path):
     try:
@@ -97,12 +100,13 @@ def download_and_convert(url, file_id):
     temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
     
     try:
+        max_duration_filter = f'duration<={MAX_VIDEO_DURATION}'
         download_cmd = [
             'yt-dlp',
-            '-f', 'worstvideo[height>=144][duration<=21600]+worstaudio/worst[height>=144][duration<=21600]/worst[duration<=21600]/best',
+            '-f', f'worstvideo[height>=144][{max_duration_filter}]+worstaudio/worst[height>=144][{max_duration_filter}]/worst[{max_duration_filter}]/best[{max_duration_filter}]',
             '--merge-output-format', 'mp4',
             '-o', temp_video,
-            '--max-filesize', '2G',
+            '--max-filesize', MAX_FILESIZE,
             url
         ]
         
@@ -111,7 +115,9 @@ def download_and_convert(url, file_id):
         if result.returncode != 0:
             error_msg = result.stderr
             if 'duration' in error_msg.lower():
-                raise Exception("Video exceeds 6-hour limit")
+                raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
+            if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
+                raise Exception(f"Video file too large (limit: {MAX_FILESIZE})")
             raise Exception(f"Download failed: {error_msg[:200]}")
         
         if not os.path.exists(temp_video):
@@ -120,14 +126,15 @@ def download_and_convert(url, file_id):
         duration = get_video_duration(temp_video)
         if duration > MAX_VIDEO_DURATION:
             os.remove(temp_video)
-            raise Exception(f"Video is {duration/3600:.1f} hours long. Maximum allowed is 6 hours.")
+            raise Exception(f"Video is {duration/3600:.1f} hours long. Maximum allowed is {MAX_VIDEO_DURATION/3600:.0f} hours.")
         
         file_size = os.path.getsize(temp_video)
         file_size_mb = file_size / (1024 * 1024)
         
+        est_time = max(1, int(duration / 60))
         update_status(file_id, {
             'status': 'converting',
-            'progress': f'Converting to 3GP format... Video: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Please wait, this may take several minutes.'
+            'progress': f'Converting to 3GP format... Video: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
         })
         
         convert_cmd = [
@@ -145,7 +152,8 @@ def download_and_convert(url, file_id):
             output_path
         ]
         
-        result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=CONVERSION_TIMEOUT)
+        dynamic_timeout = max(CONVERSION_TIMEOUT, int(duration * 2))
+        result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
         
         if os.path.exists(temp_video):
             try:
@@ -220,8 +228,9 @@ def cleanup_old_files():
                                 should_delete = True
                         elif 'timestamp' in data:
                             start_time = datetime.fromisoformat(data['timestamp'])
-                            if start_time < cutoff_time and data.get('status') in ['failed', 'unknown']:
-                                should_delete = True
+                            if start_time < cutoff_time:
+                                if data.get('status') in ['failed', 'unknown', 'downloading', 'converting']:
+                                    should_delete = True
                         
                         if should_delete:
                             file_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
@@ -261,7 +270,8 @@ cleanup_thread.start()
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    max_hours = MAX_VIDEO_DURATION / 3600
+    return render_template('index.html', max_hours=max_hours)
 
 @app.route('/favicon.ico')
 def favicon():

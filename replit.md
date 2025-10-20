@@ -13,6 +13,21 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-20**: Extended video support and improved auto-deletion
+- Extended maximum video length from short clips to **6 hours**
+- Increased download timeout to 60 minutes (3600 seconds)
+- Increased conversion timeout to 6 hours base (21600 seconds) with dynamic timeout (2x video duration)
+- Increased max file size from 2GB to 4GB
+- Made all timeouts and limits configurable via environment variables
+- yt-dlp duration filter now uses MAX_VIDEO_DURATION dynamically
+- File IDs now include timestamp to prevent URL collision issues
+- Added video duration validation with ffprobe
+- Improved auto-deletion system with better error handling
+- Added cleanup for failed/orphaned and stuck jobs (downloading/converting)
+- Enhanced user feedback with realistic processing time estimates
+- Better error messages for file size and duration limits
+- Added Railway pricing information to documentation
+
 **2025-10-20**: Critical conversion fixes
 - Fixed yt-dlp format selection (YouTube API changes broke `-f worst`)
 - Improved FFmpeg conversion with proper aspect ratio handling (scale+pad filter)
@@ -59,6 +74,10 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 ```
 
 ### Video Conversion Settings
+- **Maximum Duration**: Up to 6 hours (configurable via MAX_VIDEO_DURATION)
+- **Download Timeout**: 60 minutes base (configurable via DOWNLOAD_TIMEOUT)
+- **Conversion Timeout**: 6 hours base, dynamic timeout of 2x video duration (configurable via CONVERSION_TIMEOUT)
+- **Max File Size**: 4GB (configurable via MAX_FILESIZE)
 - **Resolution**: 176x144 (with proper aspect ratio padding)
 - **Format**: 3GP
 - **Video Codec**: MPEG-4 (more compatible than H.263)
@@ -68,7 +87,10 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - **Audio Bitrate**: 12.2kbps
 - **Frame Rate**: 12 fps
 - **Aspect Ratio**: Auto-scaled and padded to preserve original ratio
-- **Result**: 3-5 minute video = ~3-4 MB
+- **File Size Estimates**: 
+  - 5 minute video = ~3-4 MB
+  - 1 hour video = ~35-45 MB
+  - 6 hour video = ~210-270 MB
 
 ### User Flow
 1. User pastes YouTube URL on homepage
@@ -98,7 +120,9 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - Downloads stored in `/tmp/downloads/`
 - Status tracked in `/tmp/conversion_status.json`
 - Cleanup thread runs every 30 minutes
-- Files deleted after 2 hours of completion
+- Files deleted after 2 hours of completion (configurable via FILE_RETENTION_HOURS)
+- Failed/orphaned files also cleaned up automatically
+- Cleanup logs deletion count for monitoring
 - Maximum 2-3 concurrent conversions expected (personal use)
 
 ## User Preferences
@@ -116,9 +140,42 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 
 ## Environment Variables
 - `SESSION_SECRET`: Flask session secret (set via Replit Secrets)
+- `MAX_VIDEO_DURATION`: Maximum video duration in seconds (default: 21600 = 6 hours)
+- `DOWNLOAD_TIMEOUT`: Download timeout in seconds (default: 3600 = 60 minutes)
+- `CONVERSION_TIMEOUT`: Base conversion timeout in seconds; actual timeout is max(CONVERSION_TIMEOUT, duration*2) (default: 21600 = 6 hours)
+- `FILE_RETENTION_HOURS`: File retention time in hours (default: 2)
+- `MAX_FILESIZE`: Maximum download file size (default: 4G)
 
 ## Deployment Notes
 - Runs on port 5000 (required for Replit)
 - Uses development Flask server (sufficient for personal use)
 - No database required (JSON file for status)
 - Automatic cleanup prevents storage overflow
+
+## Hosting Options & Pricing
+
+### Railway
+**Status**: No longer free (discontinued free tier August 2023)
+- **Cost**: $5-20/month depending on usage
+- **Why it costs**: CPU usage for video conversion, storage for temporary files, bandwidth for downloads
+- **Not recommended** for personal use due to costs
+
+### Replit (Current Platform)
+**Status**: Has free tier available
+- **Free tier**: Limited to hobby projects, sufficient for personal use
+- **Paid tier**: Starting at $7/month for more resources
+- **Best for**: Personal projects, testing, development
+
+### Render
+**Status**: Limited free tier available
+- **Free tier**: Available with restrictions (spins down after inactivity)
+- **Cost**: ~$7/month for always-on instance
+- **Good for**: Occasional use projects
+
+### Fly.io
+**Status**: Small free tier
+- **Free tier**: Includes limited compute and bandwidth
+- **Cost**: Pay-as-you-go beyond free tier
+- **Good for**: Light usage projects
+
+**Recommendation**: For personal use, stay on Replit's free tier or use the paid tier ($7/month) which is more cost-effective than Railway for this type of video processing application.
