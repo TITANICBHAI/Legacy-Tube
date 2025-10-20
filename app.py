@@ -5,7 +5,6 @@ import threading
 import json
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
-from werkzeug.utils import secure_filename
 import hashlib
 
 app = Flask(__name__)

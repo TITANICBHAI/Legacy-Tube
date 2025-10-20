@@ -20,6 +20,8 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - Added background threading for async video processing
 - Implemented automatic cleanup system (2-hour file retention)
 - Configured workflow to run on port 5000
+- Fixed thread-safety with atomic update_status() function
+- Changed audio codec from AMR-NB to AAC for broader compatibility
 
 ## Project Architecture
 
@@ -47,9 +49,9 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - **Format**: 3GP
 - **Video Codec**: H.263
 - **Video Bitrate**: 64kbps
-- **Audio Codec**: AMR-NB (feature phone compatible)
+- **Audio Codec**: AAC (feature phone compatible)
 - **Audio Sample Rate**: 8000 Hz
-- **Audio Bitrate**: 12.2kbps
+- **Audio Bitrate**: 16kbps
 - **Frame Rate**: 12 fps
 - **Result**: 3-5 minute video = ~2-3 MB
 
