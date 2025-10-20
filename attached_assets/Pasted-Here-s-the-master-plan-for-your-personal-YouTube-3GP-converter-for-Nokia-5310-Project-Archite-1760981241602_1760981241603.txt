@@ -1,0 +1,63 @@
+Here's the master plan for your personal YouTube→3GP converter for Nokia 5310:
+
+🎯 Project Architecture:
+Stack:
+Flask - Ultra-lightweight interface (like your chatbot)
+yt-dlp - Downloads YouTube videos (free, no API needed)
+FFmpeg - Converts to 3GP 176x144 (tiny resolution for 2G)
+Background processing - Conversion happens async (user waits on status page)
+Auto-cleanup - Files deleted after 2 hours
+Railway/Render - Free hosting
+User Flow:
+Paste YouTube URL → Submit form
+Processing page → Shows "Converting... may take 1-2 minutes"
+Download ready → Big button: "Download 3GP"
+2G-friendly → File stays available for 2 hours while you download
+Technical Details:
+Video Quality:
+
+Resolution: 176x144 (perfect for Nokia screens)
+Format: 3GP (only format feature phones support)
+Audio: AMR codec (feature phone compatible)
+Bitrate: Ultra-low (~64kbps) for tiny file sizes
+Result: 3-5 minute video = ~2-3MB file
+Storage Strategy:
+
+Download → /tmp/downloads/ folder
+Convert → save 3GP
+Cleanup script runs every hour
+Delete files older than 2 hours
+Since it's just you, max 2-3 files at once
+Performance:
+
+Conversion time: 30-60 seconds per video
+Your use only = won't hit free tier limits
+Storage: ~100MB max at any time
+Bandwidth: Minimal (just you downloading)
+Interface (Opera Mini compatible):
+┌─────────────────────────┐
+│  YouTube to 3GP         │
+│  for Feature Phones     │
+├─────────────────────────┤
+│  [Paste YouTube URL]    │
+│  [Convert to 3GP]       │
+├─────────────────────────┤
+│  Tips:                  │
+│  • Works on 2G          │
+│  • 176x144 resolution   │
+│  • Files auto-delete    │
+│    after 2 hours        │
+└─────────────────────────┘
+📋 Implementation Plan:
+I'll build this step by step:
+
+Setup Flask app with ultra-lightweight design (copy chatbot structure)
+Install yt-dlp + FFmpeg via system packages
+Create download endpoint that accepts YouTube URLs
+Build conversion logic with specific 3GP settings for Nokia
+Add background processing so user sees progress
+Implement auto-cleanup script for old files
+Create simple interface optimized for Opera Mini
+Add error handling for invalid URLs/failed downloads
+Deploy to Railway with proper configuration
+Test on Nokia 5310 to verify it works
