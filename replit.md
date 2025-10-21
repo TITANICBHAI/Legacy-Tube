@@ -13,6 +13,14 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-21**: Auto-refresh feature and yt-dlp fixes
+- **Added auto-refresh**: Status page now automatically refreshes every 30 seconds during processing
+- **Fixed YouTube download errors**: Updated yt-dlp to 2025.10.14 and simplified format selector
+- **Removed complex format filters**: Now uses simple `worst/best` selector (more reliable with YouTube's changes)
+- **Auto-refresh stops when complete**: Saves bandwidth, download button appears automatically
+- **Works on Opera Mini 4.4**: Uses meta refresh tag (no JavaScript needed)
+- **Comprehensive deployment guide**: Created detailed DEPLOY.md with every single step explained
+
 **2025-10-21**: User experience improvements
 - Extended file retention from 2 hours to 6 hours for slower downloads on 2G
 - Reduced max file size from 4GB to 500MB to prevent excessive downloads
