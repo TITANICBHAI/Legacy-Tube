@@ -13,6 +13,14 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-21**: YouTube rate limit fixes for Render deployment
+- **Added rate limit workarounds**: Fixed HTTP 429 "Too Many Requests" errors on shared hosting
+- **Force IPv4**: Uses `--force-ipv4` to bypass YouTube rate limiting
+- **Custom User-Agent**: Mimics Chrome browser to avoid detection
+- **Android player client**: Uses `youtube:player_client=android` for better compatibility
+- **Request delays**: Added `--sleep-requests 1` to prevent rapid-fire requests
+- **Works on Render**: Now successfully deploys and runs on Render.com free tier
+
 **2025-10-21**: Auto-refresh feature and yt-dlp fixes
 - **Added auto-refresh**: Status page now automatically refreshes every 30 seconds during processing
 - **Fixed YouTube download errors**: Updated yt-dlp to 2025.10.14 and simplified format selector

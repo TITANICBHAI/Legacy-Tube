@@ -14,6 +14,7 @@ Convert YouTube videos to 3GP format optimized for feature phones like Nokia 531
 - **Auto Cleanup** - Files deleted after 6 hours
 - **Free Forever** - No API keys, no ads, completely free
 - **Time Estimates** - Shows processing time from the start (no guessing!)
+- **Rate Limit Protection** - Built-in workarounds for YouTube 429 errors on shared hosting
 
 ## 📊 Technical Details
 
