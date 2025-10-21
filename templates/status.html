@@ -2,6 +2,12 @@
 
 {% block title %}Conversion Status{% endblock %}
 
+{% block meta %}
+{% if file_status.status == 'downloading' or file_status.status == 'converting' %}
+<meta http-equiv="refresh" content="30">
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <h1>Conversion Status</h1>
 
@@ -19,8 +25,8 @@
 <li>2-3 hour video: 30-90 minutes</li>
 <li>4-6 hour video: 2-4 hours</li>
 </ul>
-<p class="center"><strong>This page will NOT auto-refresh</strong></p>
-<p class="center">Manually refresh to check progress</p>
+<p class="center"><strong>Page auto-refreshes every 30 seconds</strong></p>
+<p class="center">Or click button below to refresh now</p>
 </div>
 
 <form method="GET" action="/status/{{ file_id }}">
