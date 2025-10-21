@@ -103,7 +103,7 @@ def download_and_convert(url, file_id):
         max_duration_filter = f'duration<={MAX_VIDEO_DURATION}'
         download_cmd = [
             'yt-dlp',
-            '-f', f'worstvideo[height>=144][{max_duration_filter}]+worstaudio/worst[height>=144][{max_duration_filter}]/worst[{max_duration_filter}]/best[{max_duration_filter}]',
+            '-f', f'worst[height>=144][{max_duration_filter}]/worst[{max_duration_filter}]/best[{max_duration_filter}]',
             '--merge-output-format', 'mp4',
             '-o', temp_video,
             '--max-filesize', MAX_FILESIZE,
