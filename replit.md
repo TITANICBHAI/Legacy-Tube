@@ -9,10 +9,16 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - Video download via yt-dlp (no API keys required)
 - Automatic conversion to 3GP format using FFmpeg
 - Background processing with status updates
-- Automatic file cleanup (2-hour retention)
+- Automatic file cleanup (6-hour retention)
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-21**: User experience improvements
+- Extended file retention from 2 hours to 6 hours for slower downloads on 2G
+- Reduced max file size from 4GB to 500MB to prevent excessive downloads
+- Improved time estimates on status page - now shows detailed estimates from the start (no guessing game)
+- Updated all UI text to reflect 6-hour file retention and 500MB limit
+
 **2025-10-20**: Extended video support and improved auto-deletion
 - Extended maximum video length from short clips to **6 hours**
 - Increased download timeout to 60 minutes (3600 seconds)
@@ -77,7 +83,7 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - **Maximum Duration**: Up to 6 hours (configurable via MAX_VIDEO_DURATION)
 - **Download Timeout**: 60 minutes base (configurable via DOWNLOAD_TIMEOUT)
 - **Conversion Timeout**: 6 hours base, dynamic timeout of 2x video duration (configurable via CONVERSION_TIMEOUT)
-- **Max File Size**: 4GB (configurable via MAX_FILESIZE)
+- **Max File Size**: 500MB (configurable via MAX_FILESIZE)
 - **Resolution**: 176x144 (with proper aspect ratio padding)
 - **Format**: 3GP
 - **Video Codec**: MPEG-4 (more compatible than H.263)
@@ -95,19 +101,20 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 ### User Flow
 1. User pastes YouTube URL on homepage
 2. Backend starts download in background thread
-3. Status page shows "Converting..." message
+3. Status page shows "Processing..." with time estimates immediately
 4. User manually refreshes to check status
 5. When complete, download button appears
 6. User downloads 3GP file (works on 2G)
-7. File auto-deletes after 2 hours
+7. File auto-deletes after 6 hours
 
 ### Key Features
 - **No API Keys**: Uses yt-dlp library, completely free
 - **No JavaScript**: Works on Opera Mini 4.4.39 and older browsers
 - **2G Optimized**: Ultra-low bitrate for slow networks
-- **Auto Cleanup**: Files deleted after 2 hours to save space
+- **Auto Cleanup**: Files deleted after 6 hours to save space
 - **Background Processing**: Conversion happens asynchronously
 - **Manual Refresh**: No auto-refresh to save bandwidth on 2G
+- **Time Estimates**: Shows expected processing time from the start (no guessing)
 
 ### Routes
 - `GET /` - Homepage with URL input form
@@ -120,7 +127,7 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - Downloads stored in `/tmp/downloads/`
 - Status tracked in `/tmp/conversion_status.json`
 - Cleanup thread runs every 30 minutes
-- Files deleted after 2 hours of completion (configurable via FILE_RETENTION_HOURS)
+- Files deleted after 6 hours of completion (configurable via FILE_RETENTION_HOURS)
 - Failed/orphaned files also cleaned up automatically
 - Cleanup logs deletion count for monitoring
 - Maximum 2-3 concurrent conversions expected (personal use)
@@ -143,8 +150,8 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - `MAX_VIDEO_DURATION`: Maximum video duration in seconds (default: 21600 = 6 hours)
 - `DOWNLOAD_TIMEOUT`: Download timeout in seconds (default: 3600 = 60 minutes)
 - `CONVERSION_TIMEOUT`: Base conversion timeout in seconds; actual timeout is max(CONVERSION_TIMEOUT, duration*2) (default: 21600 = 6 hours)
-- `FILE_RETENTION_HOURS`: File retention time in hours (default: 2)
-- `MAX_FILESIZE`: Maximum download file size (default: 4G)
+- `FILE_RETENTION_HOURS`: File retention time in hours (default: 6)
+- `MAX_FILESIZE`: Maximum download file size (default: 500M)
 
 ## Deployment Notes
 - Runs on port 5000 (required for Replit)

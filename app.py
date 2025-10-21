@@ -25,8 +25,8 @@ os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 6 * 3600))
 DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
 CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
-FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 2))
-MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '4G')
+FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
+MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '500M')
 
 status_lock = threading.Lock()
 

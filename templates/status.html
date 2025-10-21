@@ -9,11 +9,18 @@
 <div class="status">
 <p class="center"><strong>Processing...</strong></p>
 <p>{{ file_status.progress }}</p>
-<p class="center"><strong>Processing time estimates:</strong></p>
-<p class="center">Short videos (5-10 min): 1-2 minutes</p>
-<p class="center">Medium videos (30-60 min): 5-15 minutes</p>
-<p class="center">Long videos (2-6 hours): May take several hours</p>
-<p class="center">This page will NOT auto-refresh</p>
+</div>
+
+<div class="info">
+<p class="center"><strong>Estimated Processing Times:</strong></p>
+<ul>
+<li>5-10 min video: 1-3 minutes</li>
+<li>30-60 min video: 5-15 minutes</li>
+<li>2-3 hour video: 30-90 minutes</li>
+<li>4-6 hour video: 2-4 hours</li>
+</ul>
+<p class="center"><strong>This page will NOT auto-refresh</strong></p>
+<p class="center">Manually refresh to check progress</p>
 </div>
 
 <form method="GET" action="/status/{{ file_id }}">
@@ -32,7 +39,7 @@
 <p><strong>Important:</strong></p>
 <ul>
 <li>Download will start immediately</li>
-<li>File stays available for 2 hours</li>
+<li>File stays available for 6 hours</li>
 <li>Works on slow 2G connections</li>
 <li>Play on your feature phone</li>
 </ul>
