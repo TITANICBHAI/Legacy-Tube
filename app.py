@@ -107,8 +107,9 @@ def download_and_convert(url, file_id):
             '-o', temp_video,
             '--max-filesize', MAX_FILESIZE,
             '--no-check-certificates',
+            '--extractor-args', 'youtube:player_client=android,web',
             '--force-ipv4',
-            '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            '--user-agent', 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
             '--sleep-requests', '1',
             url
         ]
