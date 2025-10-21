@@ -110,7 +110,11 @@ def download_and_convert(url, file_id):
             '--extractor-args', 'youtube:player_client=android,web',
             '--force-ipv4',
             '--user-agent', 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            '--sleep-requests', '1',
+            '--retries', '5',
+            '--retry-sleep', '3',
+            '--sleep-requests', '2',
+            '--concurrent-fragments', '1',
+            '--no-abort-on-error',
             url
         ]
         
@@ -118,10 +122,26 @@ def download_and_convert(url, file_id):
         
         if result.returncode != 0:
             error_msg = result.stderr
+            
             if 'duration' in error_msg.lower():
                 raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
             if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
                 raise Exception(f"Video file too large (limit: {MAX_FILESIZE})")
+            if '429' in error_msg or 'too many requests' in error_msg.lower():
+                raise Exception("YouTube rate limit reached. Please wait 5-10 minutes and try again.")
+            if 'age' in error_msg.lower() and 'restricted' in error_msg.lower():
+                raise Exception("Video is age-restricted. Cannot download without YouTube account.")
+            if 'private' in error_msg.lower() or 'members-only' in error_msg.lower():
+                raise Exception("Video is private or members-only. Cannot download.")
+            if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower():
+                raise Exception("Video is geo-restricted and not available in this region.")
+            if 'copyright' in error_msg.lower() or 'removed' in error_msg.lower():
+                raise Exception("Video removed due to copyright claim or deletion.")
+            if 'live' in error_msg.lower() and 'stream' in error_msg.lower():
+                raise Exception("Cannot download live streams. Try again after the stream ends.")
+            if 'sign in' in error_msg.lower() or 'login' in error_msg.lower():
+                raise Exception("Video requires sign-in. Try a different video.")
+            
             raise Exception(f"Download failed: {error_msg[:200]}")
         
         if not os.path.exists(temp_video):
