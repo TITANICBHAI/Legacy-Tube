@@ -5,12 +5,8 @@ set -o errexit
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-echo "Installing system dependencies..."
-apt-get update
-apt-get install -y ffmpeg
-
+echo "Making bundled ffmpeg/ffprobe executable..."
 chmod +x bin/ffmpeg bin/ffprobe
-
 
 echo "Creating download folder..."
 mkdir -p /tmp/downloads
