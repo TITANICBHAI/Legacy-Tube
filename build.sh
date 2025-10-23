@@ -9,6 +9,9 @@ echo "Installing system dependencies..."
 apt-get update
 apt-get install -y ffmpeg
 
+chmod +x bin/ffmpeg bin/ffprobe
+
+
 echo "Creating download folder..."
 mkdir -p /tmp/downloads
 
