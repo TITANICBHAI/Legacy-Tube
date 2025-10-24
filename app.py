@@ -6,9 +6,6 @@ import json
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FFMPEG_PATH = os.path.join(BASE_DIR, 'bin', 'ffmpeg')
-FFPROBE_PATH = os.path.join(BASE_DIR, 'bin', 'ffprobe')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-change-in-production')
@@ -78,7 +75,7 @@ def generate_file_id(url):
 def get_video_duration(file_path):
     try:
         cmd = [
-            FFPROBE_PATH,
+            'ffprobe',
             '-v', 'error',
             '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1',
@@ -165,7 +162,7 @@ def download_and_convert(url, file_id):
         })
         
         convert_cmd = [
-            FFMPEG_PATH,
+            'ffmpeg',
             '-i', temp_video,
             '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
             '-vcodec', 'mpeg4',
