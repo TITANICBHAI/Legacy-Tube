@@ -1,29 +1,31 @@
 # Use Python 3.11 slim
 FROM python:3.11-slim
 
-# Prevent Python from writing .pyc files and enable unbuffered stdout/stderr
+# Prevent Python from writing .pyc files and enable unbuffered output
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies (FFmpeg for video processing)
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     curl \
+    ca-certificates \
     git \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python packages
+# Install Python dependencies exactly as in requirements.txt
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the app code
+# Copy the rest of your app
 COPY . .
 
-# Expose port 5000 for Flask
+# Expose Flask default port
 EXPOSE 5000
 
-# Run the Flask app
+# Command to run your app
 CMD ["python", "app.py"]
