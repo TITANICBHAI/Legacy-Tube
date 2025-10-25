@@ -13,6 +13,18 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-25**: Cookie Authentication Support (FIXES 2025 YOUTUBE BLOCKING)
+- **Cookie-based Authentication**: Added support for YouTube cookies to bypass bot detection
+- **Admin Cookie Management**: New `/cookies` route for uploading and managing cookies.txt file
+- **Automatic Cookie Integration**: yt-dlp automatically uses cookies when available
+- **Cookie Validation**: Validates cookie files contain YouTube cookies before use
+- **Enhanced Error Messages**: Specific guidance for cookie-related authentication failures
+- **User Notifications**: Homepage shows cookie status and links to setup page
+- **Fixes "Sign In Required" Errors**: Resolves YouTube's 2025 bot detection on cloud servers
+- **Fixes Error 111 Connection Refused**: Proper authentication prevents connection blocks
+- **Fixes Rate Limiting**: Authenticated requests bypass IP-based rate limits
+- **Feature Phone Compatible**: Cookie upload page works on Opera Mini 4.4
+
 **2025-10-21**: Enhanced rate limit protection and error handling (PRODUCTION-READY)
 - **Android Client API**: Uses `player_client=android,web` for superior rate limit bypass on shared IPs
 - **Automatic Retry**: Auto-retries failed downloads with 3-second pause between attempts
@@ -143,14 +155,54 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - **Time Estimates**: Shows expected processing time from the start (no guessing)
 
 ### Routes
-- `GET /` - Homepage with URL input form
+- `GET /` - Homepage with URL input form (shows cookie status)
 - `GET /favicon.ico` - Favicon route (returns 204 No Content)
 - `POST /convert` - Start video conversion
 - `GET /status/<file_id>` - Check conversion status
 - `GET /download/<file_id>` - Download converted 3GP file
+- `GET /cookies` - Cookie management page
+- `POST /cookies` - Upload or delete YouTube cookies
+
+### Cookie Authentication Setup
+
+**Why Cookies Are Needed:**
+YouTube's 2025 bot detection blocks yt-dlp downloads from cloud servers, causing:
+- "Sign in to confirm you're not a bot" errors
+- "Please try again after 10 minutes" rate limiting
+- Error 111 Connection Refused
+- These happen even for public videos on shared hosting
+
+**How to Set Up Cookies:**
+
+1. **Install Browser Extension**
+   - Chrome/Edge: Search for "Get cookies.txt LOCALLY" in Chrome Web Store
+   - Firefox: Search for "cookies.txt" in Firefox Add-ons
+
+2. **Export YouTube Cookies**
+   - Visit youtube.com in your browser (no need to log in)
+   - Click the extension icon
+   - Click "Export" or "Download"
+   - Save file as `cookies.txt`
+
+3. **Upload to App**
+   - Go to `/cookies` page in the app
+   - Upload your `cookies.txt` file
+   - Validation checks ensure cookies are valid
+
+4. **Test**
+   - Try converting a YouTube video
+   - Should work without "sign in" errors
+
+**Cookie Notes:**
+- Cookies stored in `/tmp/cookies/youtube_cookies.txt`
+- Not required for all videos, but recommended on cloud hosting
+- Cookies from a logged-in YouTube account work best for age-restricted content
+- Cookies from non-logged-in session work for most public videos
+- Re-upload if cookies expire (usually every few weeks)
 
 ### Storage Management
 - Downloads stored in `/tmp/downloads/`
+- Cookies stored in `/tmp/cookies/`
 - Status tracked in `/tmp/conversion_status.json`
 - Cleanup thread runs every 30 minutes
 - Files deleted after 6 hours of completion (configurable via FILE_RETENTION_HOURS)
