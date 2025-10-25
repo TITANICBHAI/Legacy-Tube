@@ -107,125 +107,6 @@ def get_video_duration(file_path):
         return 0
 
 def download_and_convert(url, file_id):
-    proxy = get_random_proxy()  # <<< Add this line to select a random proxy
-    update_status(file_id, {
-        'status': 'downloading',
-        'progress': 'Downloading video from YouTube... (this may take several minutes for long videos)',
-        'url': url,
-        'timestamp': datetime.now().isoformat()
-    })
-    
-    output_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
-    temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
-    
-    try:
-        download_cmd = [
-            'yt-dlp',
-            '-f', 'worst/best',
-            '--merge-output-format', 'mp4',
-            '-o', temp_video,
-            '--max-filesize', MAX_FILESIZE,
-            '--no-check-certificates',
-            '--extractor-args', 'youtube:player_client=android,web',
-            '--force-ipv4',
-            '--user-agent', 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            '--retries', '5',
-            '--retry-sleep', '3',
-            '--sleep-requests', '2',
-            '--concurrent-fragments', '1',
-            '--proxy', proxy,  # <<< Add this line for rotating proxy
-            '--no-abort-on-error',
-            url
-        ]
-        
-        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
-        
-        if result.returncode != 0:
-            error_msg = result.stderr
-            
-            if 'duration' in error_msg.lower():
-                raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
-            if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
-                raise Exception(f"Video file too large (limit: {MAX_FILESIZE})")
-            if '429' in error_msg or 'too many requests' in error_msg.lower():
-                raise Exception("YouTube rate limit reached. Please wait 5-10 minutes and try again.")
-            if 'age' in error_msg.lower() and 'restricted' in error_msg.lower():
-                raise Exception("Video is age-restricted. Cannot download without YouTube account.")
-            if 'private' in error_msg.lower() or 'members-only' in error_msg.lower():
-                raise Exception("Video is private or members-only. Cannot download.")
-            if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower():
-                raise Exception("Video is geo-restricted and not available in this region.")
-            if 'copyright' in error_msg.lower() or 'removed' in error_msg.lower():
-                raise Exception("Video removed due to copyright claim or deletion.")
-            if 'live' in error_msg.lower() and 'stream' in error_msg.lower():
-                raise Exception("Cannot download live streams. Try again after the stream ends.")
-            if 'sign in' in error_msg.lower() or 'login' in error_msg.lower():
-                raise Exception("Video requires sign-in. Try a different video.")
-            
-            raise Exception(f"Download failed: {error_msg[:200]}")
-        
-        if not os.path.exists(temp_video):
-            raise Exception("Download failed: Video file not created")
-        
-        duration = get_video_duration(temp_video)
-        if duration > MAX_VIDEO_DURATION:
-            os.remove(temp_video)
-            raise Exception(f"Video is {duration/3600:.1f} hours long. Maximum allowed is {MAX_VIDEO_DURATION/3600:.0f} hours.")
-        
-        file_size = os.path.getsize(temp_video)
-        file_size_mb = file_size / (1024 * 1024)
-        
-        est_time = max(1, int(duration / 60))
-        update_status(file_id, {
-            'status': 'converting',
-            'progress': f'Converting to 3GP format... Video: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
-        })
-        
-        convert_cmd = [
-            'ffmpeg',
-            '-i', temp_video,
-            '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
-            '-vcodec', 'mpeg4',
-            '-r', '15',
-            '-b:v', '300k',
-            '-acodec', 'aac',
-            '-ar', '22050',
-            '-b:a', '48000',
-            '-ac', '1',
-            '-y',
-            output_path
-        ]
-        
-        dynamic_timeout = max(CONVERSION_TIMEOUT, int(duration * 2))
-        result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
-        
-        if os.path.exists(temp_video):
-            try:
-                os.remove(temp_video)
-            except:
-                pass
-        
-        if result.returncode != 0:
-            raise Exception(f"Conversion failed: {result.stderr[:200]}")
-        
-        if not os.path.exists(output_path):
-            raise Exception("Conversion failed: Output file not created")
-        
-        final_size = os.path.getsize(output_path)
-        final_size_mb = final_size / (1024 * 1024)
-        
-        update_status(file_id, {
-            'status': 'completed',
-            'progress': f'Conversion complete! Duration: {duration/60:.1f} min, File size: {final_size_mb:.2f} MB',
-            'filename': f'{file_id}.3gp',
-            'file_size': final_size,
-            'duration': duration,
-            'completed_at': datetime.now().isoformat()
-        })
-        
-    except subprocess.TimeoutExpired:
-
-def download_and_convert(url, file_id):
     update_status(file_id, {
         'status': 'downloading',
         'progress': 'Downloading video from YouTube... (this may take several minutes for long videos)',
@@ -271,7 +152,7 @@ def download_and_convert(url, file_id):
                     error_msg = result.stderr
                     raise Exception(f"Download failed after 5 attempts: {error_msg[:200]}")
 
-        # --- Keep all existing checks as they are ---
+        # --- Existing duration & size checks ---
         duration = get_video_duration(temp_video)
         if duration > MAX_VIDEO_DURATION:
             os.remove(temp_video)
