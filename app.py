@@ -210,25 +210,25 @@ def download_and_convert(url, file_id):
         })
 
     except subprocess.TimeoutExpired:
-        update_status(file_id, {
-            'status': 'failed',
-            'progress': 'Error: Processing timeout. Video may be too long or server is busy. Try a shorter video.'
-        })
-        if os.path.exists(temp_video):
-            try:
-                os.remove(temp_video)
-            except:
-                pass
-    except Exception as e:
-        update_status(file_id, {
-            'status': 'failed',
-            'progress': f'Error: {str(e)}'
-        })
-        if os.path.exists(temp_video):
-            try:
-                os.remove(temp_video)
-            except:
-                pass
+    update_status(file_id, {
+        'status': 'failed',
+        'progress': 'Error: Processing timeout. Video may be too long or server is busy. Try a shorter video.'
+    })
+    if os.path.exists(temp_video):
+        try:
+            os.remove(temp_video)
+        except:
+            pass
+except Exception as e:
+    update_status(file_id, {
+        'status': 'failed',
+        'progress': f'Error: {str(e)}'
+    })
+    if os.path.exists(temp_video):
+        try:
+            os.remove(temp_video)
+        except:
+            pass
                 
 def cleanup_old_files():
     while True:
