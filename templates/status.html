@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Conversion Status{% endblock %}
+
+{% block meta %}
+{% if file_status.status == 'downloading' or file_status.status == 'converting' %}
+<meta http-equiv="refresh" content="30">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<h1>Conversion Status</h1>
+
+{% if file_status.status == 'downloading' or file_status.status == 'converting' %}
+<div class="status">
+<p class="center"><strong>Processing...</strong></p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<div class="info">
+<p class="center"><strong>Estimated Processing Times:</strong></p>
+<ul>
+<li>5-10 min video: 1-3 minutes</li>
+<li>30-60 min video: 5-15 minutes</li>
+<li>2-3 hour video: 30-90 minutes</li>
+<li>4-6 hour video: 2-4 hours</li>
+</ul>
+<p class="center"><strong>Page auto-checks every 30 seconds</strong></p>
+<p class="center">Download button will appear automatically when ready</p>
+<p class="center">(Or click button below to check now)</p>
+</div>
+
+<form method="GET" action="/status/{{ file_id }}">
+<button type="submit">Refresh Status</button>
+</form>
+
+{% elif file_status.status == 'completed' %}
+<div class="success">
+<p class="center"><strong>&#x2713; Conversion Complete!</strong></p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<a href="/download/{{ file_id }}" class="button">Download 3GP File</a>
+
+<div class="info">
+<p><strong>Important:</strong></p>
+<ul>
+<li>Download will start immediately</li>
+<li>File stays available for 6 hours</li>
+<li>Works on slow 2G connections</li>
+<li>Play on your feature phone</li>
+</ul>
+</div>
+
+<hr>
+<a href="/" class="button">Convert Another Video</a>
+
+{% elif file_status.status == 'failed' %}
+<div class="error">
+<p class="center"><strong>Conversion Failed</strong></p>
+<p>{{ file_status.progress }}</p>
+</div>
+
+<a href="/" class="button">Try Again</a>
+
+<div class="info">
+<p><strong>Common issues:</strong></p>
+<ul>
+<li>Check if YouTube URL is correct</li>
+<li>Video may be age-restricted</li>
+<li>Video may be private or deleted</li>
+<li>Video exceeds 6-hour limit</li>
+<li>Try a different video</li>
+</ul>
+</div>
+
+{% else %}
+<div class="error">
+<p class="center">Status unknown</p>
+<p>File not found or expired</p>
+</div>
+
+<a href="/" class="button">Go Home</a>
+{% endif %}
+
+{% endblock %}
