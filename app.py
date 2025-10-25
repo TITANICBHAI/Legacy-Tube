@@ -209,26 +209,7 @@ def download_and_convert(url, file_id):
             'completed_at': datetime.now().isoformat()
         })
 
-    except subprocess.TimeoutExpired:
-    update_status(file_id, {
-        'status': 'failed',
-        'progress': 'Error: Processing timeout. Video may be too long or server is busy. Try a shorter video.'
-    })
-    if os.path.exists(temp_video):
-        try:
-            os.remove(temp_video)
-        except:
-            pass
-except Exception as e:
-    update_status(file_id, {
-        'status': 'failed',
-        'progress': f'Error: {str(e)}'
-    })
-    if os.path.exists(temp_video):
-        try:
-            os.remove(temp_video)
-        except:
-            pass
+    
                 
 def cleanup_old_files():
     while True:
@@ -255,7 +236,26 @@ def cleanup_old_files():
                         if 'completed_at' in data:
                             completed_time = datetime.fromisoformat(data['completed_at'])
                             if completed_time < cutoff_time:
-                                should_delete = True
+           except subprocess.TimeoutExpired:
+    update_status(file_id, {
+        'status': 'failed',
+        'progress': 'Error: Processing timeout. Video may be too long or server is busy. Try a shorter video.'
+    })
+    if os.path.exists(temp_video):
+        try:
+            os.remove(temp_video)
+        except:
+            pass
+except Exception as e:
+    update_status(file_id, {
+        'status': 'failed',
+        'progress': f'Error: {str(e)}'
+    })
+    if os.path.exists(temp_video):
+        try:
+            os.remove(temp_video)
+        except:
+            pass                     should_delete = True
                         elif 'timestamp' in data:
                             start_time = datetime.fromisoformat(data['timestamp'])
                             if start_time < cutoff_time:
