@@ -19,8 +19,11 @@ def add_cache_control_headers(response):
     return response
 
 DOWNLOAD_FOLDER = '/tmp/downloads'
+COOKIES_FOLDER = '/tmp/cookies'
 STATUS_FILE = '/tmp/conversion_status.json'
+COOKIES_FILE = os.path.join(COOKIES_FOLDER, 'youtube_cookies.txt')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+os.makedirs(COOKIES_FOLDER, exist_ok=True)
 
 MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 6 * 3600))
 DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
@@ -88,6 +91,24 @@ def get_video_duration(file_path):
     except:
         return 0
 
+def has_cookies():
+    return os.path.exists(COOKIES_FILE) and os.path.getsize(COOKIES_FILE) > 0
+
+def validate_cookies():
+    if not has_cookies():
+        return False, "No cookies file found"
+    
+    try:
+        with open(COOKIES_FILE, 'r') as f:
+            content = f.read()
+            if 'youtube.com' not in content.lower():
+                return False, "Cookie file does not contain YouTube cookies"
+            if len(content.strip()) < 50:
+                return False, "Cookie file appears to be empty or invalid"
+            return True, "Cookies are valid"
+    except Exception as e:
+        return False, f"Error reading cookies: {str(e)}"
+
 def download_and_convert(url, file_id):
     update_status(file_id, {
         'status': 'downloading',
@@ -114,9 +135,13 @@ def download_and_convert(url, file_id):
             '--retry-sleep', '3',
             '--sleep-requests', '2',
             '--concurrent-fragments', '1',
-            '--no-abort-on-error',
-            url
+            '--no-abort-on-error'
         ]
+        
+        if has_cookies():
+            download_cmd.extend(['--cookies', COOKIES_FILE])
+        
+        download_cmd.append(url)
         
         result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
         
@@ -139,8 +164,11 @@ def download_and_convert(url, file_id):
                 raise Exception("Video removed due to copyright claim or deletion.")
             if 'live' in error_msg.lower() and 'stream' in error_msg.lower():
                 raise Exception("Cannot download live streams. Try again after the stream ends.")
-            if 'sign in' in error_msg.lower() or 'login' in error_msg.lower():
-                raise Exception("Video requires sign-in. Try a different video.")
+            if 'sign in' in error_msg.lower() or 'login' in error_msg.lower() or 'bot' in error_msg.lower():
+                if has_cookies():
+                    raise Exception("YouTube authentication failed. Your cookies may have expired. Please upload fresh cookies from /cookies page.")
+                else:
+                    raise Exception("YouTube requires authentication. Please upload cookies from /cookies page. See instructions there.")
             
             raise Exception(f"Download failed: {error_msg[:200]}")
         
@@ -295,7 +323,8 @@ cleanup_thread.start()
 @app.route('/')
 def index():
     max_hours = MAX_VIDEO_DURATION / 3600
-    return render_template('index.html', max_hours=max_hours)
+    cookies_status = has_cookies()
+    return render_template('index.html', max_hours=max_hours, has_cookies=cookies_status)
 
 @app.route('/favicon.ico')
 def favicon():
@@ -336,6 +365,52 @@ def download(file_id):
         return redirect(url_for('index'))
     
     return send_file(file_path, as_attachment=True, download_name=f'video_{file_id}.3gp')
+
+@app.route('/cookies', methods=['GET', 'POST'])
+def cookies_page():
+    if request.method == 'POST':
+        if 'cookies_file' in request.files:
+            file = request.files['cookies_file']
+            if file.filename == '':
+                flash('No file selected')
+                return redirect(url_for('cookies_page'))
+            
+            if file and file.filename.endswith('.txt'):
+                try:
+                    content = file.read().decode('utf-8')
+                    
+                    if 'youtube.com' not in content.lower():
+                        flash('Invalid cookie file: must contain YouTube cookies')
+                        return redirect(url_for('cookies_page'))
+                    
+                    with open(COOKIES_FILE, 'w') as f:
+                        f.write(content)
+                    
+                    flash('Cookies uploaded successfully!')
+                    return redirect(url_for('cookies_page'))
+                except Exception as e:
+                    flash(f'Error uploading cookies: {str(e)}')
+                    return redirect(url_for('cookies_page'))
+            else:
+                flash('Please upload a .txt file')
+                return redirect(url_for('cookies_page'))
+        
+        elif 'delete_cookies' in request.form:
+            try:
+                if os.path.exists(COOKIES_FILE):
+                    os.remove(COOKIES_FILE)
+                flash('Cookies deleted successfully')
+            except Exception as e:
+                flash(f'Error deleting cookies: {str(e)}')
+            return redirect(url_for('cookies_page'))
+    
+    cookies_exist = has_cookies()
+    is_valid, message = validate_cookies() if cookies_exist else (False, "No cookies uploaded")
+    
+    return render_template('cookies.html', 
+                         cookies_exist=cookies_exist, 
+                         is_valid=is_valid, 
+                         validation_message=message)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
