@@ -101,11 +101,36 @@ def validate_cookies():
     try:
         with open(COOKIES_FILE, 'r') as f:
             content = f.read()
+            
             if 'youtube.com' not in content.lower():
                 return False, "Cookie file does not contain YouTube cookies"
+            
             if len(content.strip()) < 50:
                 return False, "Cookie file appears to be empty or invalid"
-            return True, "Cookies are valid"
+            
+            lines = content.strip().split('\n')
+            has_youtube_cookies = False
+            
+            for line in lines:
+                if line.startswith('#') or not line.strip():
+                    continue
+                
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    domain = parts[0]
+                    cookie_name = parts[5]
+                    
+                    if 'youtube.com' in domain.lower():
+                        has_youtube_cookies = True
+                        
+                        if cookie_name in ['LOGIN_INFO', '__Secure-1PSID', '__Secure-3PSID']:
+                            return True, "Valid YouTube cookies with authentication token found"
+            
+            if has_youtube_cookies:
+                return False, "YouTube cookies found but missing LOGIN_INFO or session tokens. Please export cookies while logged into YouTube, or from a fresh youtube.com visit."
+            else:
+                return False, "No YouTube cookies detected in file"
+            
     except Exception as e:
         return False, f"Error reading cookies: {str(e)}"
 
@@ -386,7 +411,13 @@ def cookies_page():
                     with open(COOKIES_FILE, 'w') as f:
                         f.write(content)
                     
-                    flash('Cookies uploaded successfully!')
+                    is_valid, validation_msg = validate_cookies()
+                    if not is_valid:
+                        os.remove(COOKIES_FILE)
+                        flash(f'Cookie validation failed: {validation_msg}')
+                        return redirect(url_for('cookies_page'))
+                    
+                    flash('Cookies uploaded and validated successfully!')
                     return redirect(url_for('cookies_page'))
                 except Exception as e:
                     flash(f'Error uploading cookies: {str(e)}')

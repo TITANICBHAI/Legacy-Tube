@@ -17,7 +17,8 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - **Cookie-based Authentication**: Added support for YouTube cookies to bypass bot detection
 - **Admin Cookie Management**: New `/cookies` route for uploading and managing cookies.txt file
 - **Automatic Cookie Integration**: yt-dlp automatically uses cookies when available
-- **Cookie Validation**: Validates cookie files contain YouTube cookies before use
+- **Strict Cookie Validation**: Validates presence of LOGIN_INFO or __Secure-*PSID tokens
+- **Upload Validation**: Rejects invalid cookies immediately with specific error messages
 - **Enhanced Error Messages**: Specific guidance for cookie-related authentication failures
 - **User Notifications**: Homepage shows cookie status and links to setup page
 - **Fixes "Sign In Required" Errors**: Resolves YouTube's 2025 bot detection on cloud servers
