@@ -9,7 +9,8 @@ echo "Installing system dependencies..."
 apt-get update
 apt-get install -y ffmpeg
 
-echo "Creating download folder..."
+echo "Creating required folders..."
 mkdir -p /tmp/downloads
+mkdir -p /tmp/cookies
 
 echo "Build completed successfully!"
