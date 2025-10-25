@@ -40,4 +40,15 @@
 <p class="center"><strong>100% Free - No Ads</strong></p>
 <p class="center">Optimized for Opera Mini 4.4</p>
 </div>
+
+{% if not has_cookies %}
+<div class="error">
+<p class="center"><strong>Notice:</strong></p>
+<p>YouTube may block downloads from cloud servers. If you see "sign in required" errors, <a href="/cookies" style="color: #a44a4a; text-decoration: underline;">upload cookies here</a>.</p>
+</div>
+{% else %}
+<div class="success">
+<p class="center">&#x2713; Cookies configured - ready to bypass YouTube restrictions</p>
+</div>
+{% endif %}
 {% endblock %}
