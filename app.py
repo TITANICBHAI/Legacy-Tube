@@ -6,6 +6,24 @@ import json
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
+# ----------- ROTATING PROXY POOL -----------
+PROXIES = [
+    "http://144.91.109.105:3128",
+    "http://51.38.83.147:3128",
+    "http://188.166.83.65:8080",
+    "http://51.83.163.41:8080",
+    "http://51.158.68.68:8811",
+    "http://144.91.75.67:3128",
+    "http://165.22.254.150:8080",
+    "http://157.245.207.174:3128",
+    "http://144.91.74.189:3128",
+    "http://165.22.255.102:8080"
+]  # Replace or add more free proxies if needed
+
+import random
+
+def get_random_proxy():
+    return random.choice(PROXIES)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-change-in-production')
@@ -114,6 +132,7 @@ def download_and_convert(url, file_id):
             '--retry-sleep', '3',
             '--sleep-requests', '2',
             '--concurrent-fragments', '1',
+            '--proxy', proxy,  # <<< Add this line for rotating proxy
             '--no-abort-on-error',
             url
         ]
