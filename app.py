@@ -107,6 +107,7 @@ def get_video_duration(file_path):
         return 0
 
 def download_and_convert(url, file_id):
+    proxy = get_random_proxy()  # <<< Add this line to select a random proxy
     update_status(file_id, {
         'status': 'downloading',
         'progress': 'Downloading video from YouTube... (this may take several minutes for long videos)',
