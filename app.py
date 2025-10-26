@@ -402,7 +402,7 @@ def cookies_page():
                 flash('No file selected')
                 return redirect(url_for('cookies_page'))
             
-            if file and file.filename.endswith('.txt'):
+            if file and file.filename and file.filename.endswith('.txt'):
                 try:
                     content = file.read().decode('utf-8')
                     
