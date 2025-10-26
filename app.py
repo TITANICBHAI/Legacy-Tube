@@ -185,8 +185,8 @@ def download_and_convert(url, file_id):
                 raise Exception("Video is age-restricted. Cannot download without YouTube account.")
             if 'private' in error_msg.lower() or 'members-only' in error_msg.lower():
                 raise Exception("Video is private or members-only. Cannot download.")
-            if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower():
-                raise Exception("Video is geo-restricted and not available in this region.")
+            if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower() or 'not made this video available in your country' in error_msg.lower():
+                raise Exception("Video is geo-restricted by the uploader and not available in your region. Try a different video or use a VPN to access region-locked content.")
             if 'copyright' in error_msg.lower() or 'removed' in error_msg.lower():
                 raise Exception("Video removed due to copyright claim or deletion.")
             if 'live' in error_msg.lower() and 'stream' in error_msg.lower():
