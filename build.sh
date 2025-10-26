@@ -5,14 +5,12 @@ set -o errexit
 echo "Installing Python dependencies..."
 pip install -r requirements.txt
 
-echo "Making binaries executable..."
-chmod +x bin/ffmpeg bin/ffprobe
+echo "Installing system dependencies..."
+apt-get update
+apt-get install -y ffmpeg
 
-# Add local bin to PATH for build and runtime
-export PATH="$PWD/bin:$PATH"
-echo "PATH set to: $PATH"
-
-echo "Creating download folder..."
+echo "Creating required folders..."
 mkdir -p /tmp/downloads
+mkdir -p /tmp/cookies
 
 echo "Build completed successfully!"
