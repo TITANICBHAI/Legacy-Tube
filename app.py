@@ -3,6 +3,8 @@ import subprocess
 import time
 import threading
 import json
+import signal
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
@@ -282,6 +284,7 @@ def download_and_convert(url, file_id):
             '-ar', '22050',
             '-b:a', '48000',
             '-ac', '1',
+            '-threads', '1',
             '-y',
             output_path
         ]
@@ -402,6 +405,26 @@ def cleanup_old_files():
 cleanup_thread = threading.Thread(target=cleanup_old_files, daemon=True)
 cleanup_thread.start()
 
+def signal_handler(sig, frame):
+    print(f'\nReceived signal {sig}. Gracefully shutting down...')
+    print('Cleaning up temporary files...')
+    try:
+        for filename in os.listdir(DOWNLOAD_FOLDER):
+            file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+            if os.path.isfile(file_path) and filename.endswith('_temp.mp4'):
+                try:
+                    os.remove(file_path)
+                    print(f'Cleaned up temp file: {filename}')
+                except:
+                    pass
+    except:
+        pass
+    print('Shutdown complete.')
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
 @app.route('/')
 def index():
     max_hours = MAX_VIDEO_DURATION / 3600
@@ -411,6 +434,10 @@ def index():
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
+
+@app.route('/health')
+def health():
+    return {'status': 'ok', 'service': 'youtube-3gp-converter'}, 200
 
 @app.route('/convert', methods=['POST'])
 def convert():

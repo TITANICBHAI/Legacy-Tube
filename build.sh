@@ -8,7 +8,7 @@ pip install --no-cache-dir -r requirements.txt
 echo "Installing system dependencies..."
 if command -v apt-get &> /dev/null; then
     apt-get update -qq
-    apt-get install -y -qq ffmpeg yt-dlp 2>/dev/null || true
+    apt-get install -y -qq ffmpeg yt-dlp
 elif command -v apk &> /dev/null; then
     apk add --no-cache ffmpeg yt-dlp
 fi
