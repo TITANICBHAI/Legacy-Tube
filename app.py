@@ -25,11 +25,11 @@ COOKIES_FILE = os.path.join(COOKIES_FOLDER, 'youtube_cookies.txt')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(COOKIES_FOLDER, exist_ok=True)
 
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 6 * 3600))
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))
 DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
 CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
-MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '500M')
+MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '2G')
 
 status_lock = threading.Lock()
 
