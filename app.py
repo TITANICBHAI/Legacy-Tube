@@ -153,14 +153,16 @@ def download_and_convert(url, file_id):
             '-o', temp_video,
             '--max-filesize', MAX_FILESIZE,
             '--no-check-certificates',
-            '--extractor-args', 'youtube:player_client=android,web',
+            '--extractor-args', 'youtube:player_client=android,ios,web;player_skip=webpage,configs',
             '--force-ipv4',
-            '--user-agent', 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            '--retries', '5',
-            '--retry-sleep', '3',
+            '--user-agent', 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+            '--retries', '10',
+            '--retry-sleep', '5',
+            '--fragment-retries', '10',
             '--sleep-requests', '2',
             '--concurrent-fragments', '1',
-            '--no-abort-on-error'
+            '--no-abort-on-error',
+            '--extractor-retries', '5'
         ]
         
         if has_cookies():
