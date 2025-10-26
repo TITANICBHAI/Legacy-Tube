@@ -13,6 +13,20 @@ A web application that converts YouTube videos to 3GP format (176x144 resolution
 - No JavaScript - works on Opera Mini 4.4
 
 ## Recent Changes
+**2025-10-26**: Multi-Strategy Download System & Render Optimization (WORKS WITHOUT COOKIES!)
+- **4 Automatic Fallback Strategies**: Android TV → iOS → Android Mobile → Web Embedded clients
+- **Progressive Retry Logic**: Automatically tries different methods with exponential backoff
+- **Works Without Cookies**: Most public videos now work without authentication
+- **Better Error Messages**: Less pushy about cookies, more helpful guidance
+- **Render Free Tier Optimized**: Memory and CPU optimizations for 512MB limit
+- **Gunicorn Production Server**: Single worker, 2 threads, worker recycling
+- **HTTP Chunk Size Control**: 10MB chunks reduce memory usage
+- **Socket Timeout Protection**: 30-second timeout prevents hangs
+- **Comprehensive Deployment Guide**: New RENDER_DEPLOYMENT.md with full instructions
+- **Build Script Enhanced**: Multi-platform support (apt/apk) with verification
+- **Requirements Cleaned Up**: Removed duplicate dependencies
+- **Type Safety Fix**: Fixed filename None check in cookie upload
+
 **2025-10-25**: Cookie Authentication Support (FIXES 2025 YOUTUBE BLOCKING)
 - **Cookie-based Authentication**: Added support for YouTube cookies to bypass bot detection
 - **Admin Cookie Management**: New `/cookies` route for uploading and managing cookies.txt file

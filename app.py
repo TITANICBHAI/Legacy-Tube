@@ -146,34 +146,89 @@ def download_and_convert(url, file_id):
     temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
     
     try:
-        download_cmd = [
+        base_cmd = [
             'yt-dlp',
             '-f', 'worst/best',
             '--merge-output-format', 'mp4',
             '-o', temp_video,
             '--max-filesize', MAX_FILESIZE,
             '--no-check-certificates',
-            '--extractor-args', 'youtube:player_client=android,ios,web;player_skip=webpage,configs',
             '--force-ipv4',
-            '--user-agent', 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            '--retries', '10',
-            '--retry-sleep', '5',
-            '--fragment-retries', '10',
-            '--sleep-requests', '2',
+            '--retries', '15',
+            '--retry-sleep', '3',
+            '--fragment-retries', '15',
+            '--sleep-requests', '1',
             '--concurrent-fragments', '1',
             '--no-abort-on-error',
-            '--extractor-retries', '5'
+            '--extractor-retries', '10',
+            '--socket-timeout', '30',
+            '--http-chunk-size', '10M'
+        ]
+        
+        strategies = [
+            {
+                'name': 'Android TV',
+                'args': [
+                    '--extractor-args', 'youtube:player_client=android_embedded,android,ios;player_skip=webpage,configs',
+                    '--user-agent', 'com.google.android.youtube/19.02.39 (Linux; U; Android 13; Pixel 7) gzip'
+                ]
+            },
+            {
+                'name': 'iOS',
+                'args': [
+                    '--extractor-args', 'youtube:player_client=ios,android;player_skip=webpage',
+                    '--user-agent', 'com.google.ios.youtube/19.02.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)'
+                ]
+            },
+            {
+                'name': 'Android Mobile',
+                'args': [
+                    '--extractor-args', 'youtube:player_client=android,web;player_skip=configs',
+                    '--user-agent', 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+                ]
+            },
+            {
+                'name': 'Web Embedded',
+                'args': [
+                    '--extractor-args', 'youtube:player_client=web_embedded,web;player_skip=webpage',
+                    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                ]
+            }
         ]
         
         if has_cookies():
-            download_cmd.extend(['--cookies', COOKIES_FILE])
+            base_cmd.extend(['--cookies', COOKIES_FILE])
         
-        download_cmd.append(url)
+        result = None
+        last_error = None
         
-        result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
+        for i, strategy in enumerate(strategies):
+            try:
+                download_cmd = base_cmd + strategy['args'] + [url]
+                
+                if i > 0:
+                    update_status(file_id, {
+                        'status': 'downloading',
+                        'progress': f'Retrying with {strategy["name"]} client... (attempt {i+1}/{len(strategies)})'
+                    })
+                    time.sleep(3 * i)
+                
+                result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
+                
+                if result.returncode == 0 and os.path.exists(temp_video):
+                    break
+                else:
+                    last_error = result.stderr
+                    
+            except subprocess.TimeoutExpired:
+                last_error = "Download timeout"
+                continue
+            except Exception as e:
+                last_error = str(e)
+                continue
         
-        if result.returncode != 0:
-            error_msg = result.stderr
+        if not result or result.returncode != 0:
+            error_msg = last_error if last_error else "All download strategies failed"
             
             if 'duration' in error_msg.lower():
                 raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
@@ -193,9 +248,9 @@ def download_and_convert(url, file_id):
                 raise Exception("Cannot download live streams. Try again after the stream ends.")
             if 'sign in' in error_msg.lower() or 'login' in error_msg.lower() or 'bot' in error_msg.lower():
                 if has_cookies():
-                    raise Exception("YouTube authentication failed. Your cookies may have expired. Please upload fresh cookies from /cookies page.")
+                    raise Exception("YouTube authentication failed even with cookies. Try: 1) Upload fresh cookies from /cookies page, or 2) Wait 10 minutes and retry.")
                 else:
-                    raise Exception("YouTube requires authentication. Please upload cookies from /cookies page. See instructions there.")
+                    raise Exception("YouTube is asking for sign-in verification. This video may work with cookies - see /cookies page for optional setup. Or try a different video.")
             
             raise Exception(f"Download failed: {error_msg[:200]}")
         
