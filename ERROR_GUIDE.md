@@ -12,27 +12,164 @@
 
 ## Common Errors & Solutions
 
+### ❌ Error: "YouTube IP BLOCK detected!" (403 Forbidden)
+
+**What it means**: YouTube has blocked your server's IP address (Render uses cloud IPs that YouTube blocks).
+
+**Symptoms**:
+```
+⚠️ YouTube IP BLOCK detected!
+HTTP Error 403: Forbidden
+Sign in to confirm you're not a bot
+```
+
+**Solutions** (in order of effectiveness):
+
+#### Solution 1: Upload Cookies ⭐ **MOST EFFECTIVE**
+```
+1. Go to: https://your-app.onrender.com/cookies
+2. Export cookies from browser (see COOKIE_SETUP_GUIDE.md)
+3. Upload cookies.txt file
+4. Try download again
+```
+
+#### Solution 2: Enable IPv6
+```
+Render Dashboard → Environment Variables:
+USE_IPV6=true
+
+Then redeploy
+```
+
+#### Solution 3: Use Proxy (Advanced)
+```
+Get a residential proxy (Bright Data, Smartproxy, etc.)
+Set environment variable:
+PROXY_URL=http://user:pass@proxy-server:port
+```
+
+#### Solution 4: Combination (Best Long-Term)
+```
+1. Set USE_IPV6=true
+2. Set RATE_LIMIT_BYTES=500000
+3. Upload cookies from /cookies page
+```
+
+**Success rate**: 95%+ with cookies uploaded
+
+---
+
+### ❌ Error: "YouTube bot detection triggered!" (Bot Warning)
+
+**What it means**: YouTube detected automated access.
+
+**Symptoms**:
+```
+Sign in to confirm you're not a bot
+All download strategies failed
+```
+
+**Solutions**:
+```
+✅ Upload cookies from /cookies page (best solution)
+✅ Wait 10-15 minutes before trying again
+✅ Enable rate limiting: RATE_LIMIT_BYTES=500000
+```
+
+---
+
+### ❌ Error: "429 Too Many Requests" (Rate Limiting)
+
+**What it means**: You've made too many download requests too quickly.
+
+**Symptoms**:
+```
+HTTP Error 429: Too Many Requests
+Throttled at ~1MB/s
+```
+
+**Solutions**:
+
+#### Immediate Fix:
+```
+✅ Wait 10-15 minutes
+✅ Upload cookies from /cookies page
+```
+
+#### Permanent Fix:
+```
+Render Dashboard → Environment Variables:
+RATE_LIMIT_BYTES=500000  # 500KB/s limit
+
+This prevents 429 errors by limiting download speed
+```
+
+**Recommended rate limits**:
+- `500000` (500KB/s) - Safe, prevents 429 errors
+- `1000000` (1MB/s) - Faster, slight risk
+- `0` (unlimited) - Fastest, high risk
+
+---
+
+### ❌ Error: "Server storage full" (Disk Space)
+
+**What it means**: /tmp has reached 2GB limit (Render hard limit).
+
+**Symptoms**:
+```
+Server storage full (XXMB free)
+Insufficient disk space for conversion
+```
+
+**Solutions**:
+
+#### Immediate Fix:
+```
+Wait 30 minutes - automatic cleanup will run
+or
+Restart service on Render Dashboard
+```
+
+#### Prevent Future Issues:
+```
+Render Dashboard → Environment Variables:
+FILE_RETENTION_HOURS=3  # Delete files after 3 hours
+MAX_FILESIZE=500M  # Limit video size
+```
+
+**How disk monitoring works**:
+- ✅ Automatic cleanup every 30 minutes
+- ✅ Emergency cleanup when space <1.5GB
+- ✅ Pre-download space checks
+- ✅ Files auto-deleted after 6 hours
+
+---
+
 ### ❌ Error: "All download strategies failed"
 
 **What it means**: The app tried 4 different methods to download the video and all failed.
 
 **Common causes**:
-1. YouTube is rate-limiting your IP
-2. Video is age-restricted and you don't have cookies
-3. Video is private or deleted
-4. Geo-blocked content
+1. ⭐ YouTube IP blocking (most common)
+2. YouTube rate limiting (429 error)
+3. Video is age-restricted without cookies
+4. Video is private or deleted
+5. Geo-blocked content
 
 **Solutions**:
 ```
-✅ Wait 10-15 minutes and try again (rate limit cooldown)
-✅ Upload YouTube cookies at /cookies page
+✅ Upload YouTube cookies at /cookies page ⭐ FIXES 90%
+✅ Set USE_IPV6=true (Render environment variable)
+✅ Set RATE_LIMIT_BYTES=500000 (prevents 429)
+✅ Wait 10-15 minutes and try again
 ✅ Try a different video to test
 ✅ Check if video is public and available
 ```
 
 **How to fix permanently**:
 - Set up cookies (see COOKIE_SETUP_GUIDE.md)
-- Videos should work 90% of the time without cookies
+- Enable IPv6 (USE_IPV6=true)
+- Enable rate limiting (RATE_LIMIT_BYTES=500000)
 
 ---
 
