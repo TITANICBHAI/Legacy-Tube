@@ -33,7 +33,18 @@ The application features ultra-lightweight HTML templates designed for feature p
 - **YouTube Authentication**: Supports cookie-based authentication to bypass YouTube's bot detection and rate limiting, allowing access to most public videos without requiring a logged-in YouTube account.
 - **Background Processing**: Video download and conversion occur asynchronously using Python threading, with status updates available on a dedicated page.
 - **File Management**: Automatic cleanup system deletes converted files after 6 hours and manages orphaned/failed jobs.
-- **Network Optimization**: Designed for 2G networks with minimal data usage, intelligent retry logic, and optimized download strategies (e.g., using Android TV client API via yt-dlp, `--force-ipv4`).
+- **Network Optimization**: Designed for 2G networks with minimal data usage, intelligent retry logic, and optimized download strategies (e.g., using Android TV client API via yt-dlp).
+- **YouTube IP Block Bypass**: Multiple strategies to bypass YouTube's cloud IP blocking:
+    - **IPv6 Support**: Optional IPv6 usage (less blocked by YouTube)
+    - **Proxy Support**: Configure HTTP/SOCKS5 proxy via environment variable
+    - **Rate Limiting**: Configurable download speed limits to avoid 429 errors
+    - **Enhanced User Agents**: Mimics real Android/iOS devices
+    - **Cookie Authentication**: Upload browser cookies for authenticated access
+- **Disk Space Management**: Advanced monitoring for Render's 2GB /tmp limit:
+    - **Real-time Monitoring**: Checks disk space before downloads and conversions
+    - **Emergency Cleanup**: Automatic cleanup when space drops below threshold
+    - **Pre-download Checks**: Validates sufficient space before starting
+    - **Configurable Thresholds**: Alert when free space < 1.5GB (configurable)
 
 ### System Design Choices
 - **Stateless Design**: Uses temporary file storage and a simple JSON file for status tracking instead of a traditional database, making it suitable for lightweight deployments.
@@ -55,7 +66,17 @@ The application features ultra-lightweight HTML templates designed for feature p
 - **Gunicorn**: WSGI HTTP Server for UNIX (used in production deployments).
 
 ## Documentation
-- **RENDER_DEPLOYMENT.md**: Comprehensive guide for deploying to Render's free tier
-- **DOCKER_DEPLOYMENT.md**: Docker deployment instructions and optimizations
-- **COOKIE_SETUP_GUIDE.md**: Instructions for setting up YouTube cookies
+- **RENDER_ADVANCED.md**: Complete advanced guide for Render deployment with YouTube IP block bypass solutions, rate limiting, disk space management, and troubleshooting
+- **NO_CARD_FREE_HOSTING.md**: Guide to 100% free hosting platforms without credit card requirements (Render, Replit, Railway comparison)
+- **ERROR_GUIDE.md**: Comprehensive error troubleshooting with solutions for IP blocking (403), rate limiting (429), disk space issues, and more
+- **COOKIE_SETUP_GUIDE.md**: Instructions for setting up YouTube cookies to bypass IP blocks and bot detection
 - **ADVANCED_TINKERING.md**: Advanced customization guide for developers who want to modify settings, optimize performance, or add new features
+- **DOCKER_DEPLOYMENT.md**: Docker deployment instructions and optimizations
+
+## Recent Updates (October 27, 2025)
+- ✅ Added YouTube IP block bypass with IPv6, proxy, and rate limiting support
+- ✅ Implemented advanced disk space monitoring for Render's 2GB /tmp limit
+- ✅ Enhanced error detection for IP blocks (403) and rate limiting (429)
+- ✅ Added emergency cleanup system when disk space is low
+- ✅ Updated download strategies with better device mimicking (Android TV, iOS)
+- ✅ Created comprehensive documentation for known issues and solutions
