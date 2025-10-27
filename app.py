@@ -42,6 +42,17 @@ CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
 MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '2G')
 
+# YouTube IP block bypass settings
+USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
+PROXY_URL = os.environ.get('PROXY_URL', '')  # Optional: http://user:pass@proxy:port
+USE_OAUTH = os.environ.get('USE_OAUTH', 'false').lower() == 'true'
+
+# Advanced performance settings
+RATE_LIMIT_BYTES = int(os.environ.get('RATE_LIMIT_BYTES', 0))  # 0 = unlimited, set to 500000 for 500KB/s
+MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))
+ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 'true').lower() == 'true'
+DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 1500))  # Alert when < 1.5GB free
+
 status_lock = threading.Lock()
 
 def get_status():
@@ -85,6 +96,50 @@ def generate_file_id(url):
     timestamp = str(int(time.time() * 1000))
     combined = f"{url}_{timestamp}"
     return hashlib.md5(combined.encode()).hexdigest()[:16]
+
+def check_disk_space():
+    """Check available disk space on /tmp (Render has 2GB ephemeral storage limit)"""
+    try:
+        import shutil
+        total, used, free = shutil.disk_usage('/tmp')
+        free_mb = free / (1024 * 1024)
+        used_mb = used / (1024 * 1024)
+        total_mb = total / (1024 * 1024)
+        
+        logger.info(f"Disk space: {free_mb:.0f}MB free / {total_mb:.0f}MB total ({used_mb:.0f}MB used)")
+        
+        if free_mb < DISK_SPACE_THRESHOLD_MB:
+            logger.warning(f"⚠️ Low disk space: {free_mb:.0f}MB free (threshold: {DISK_SPACE_THRESHOLD_MB}MB)")
+            return False, free_mb
+        return True, free_mb
+    except Exception as e:
+        logger.error(f"Error checking disk space: {e}")
+        return True, 0  # Continue anyway
+
+def clean_tmp_immediately():
+    """Emergency cleanup of /tmp when space is low"""
+    try:
+        import glob
+        
+        # Clean downloads folder
+        files = glob.glob(os.path.join(DOWNLOAD_FOLDER, '*'))
+        deleted = 0
+        freed_mb = 0
+        
+        for filepath in files:
+            try:
+                size_mb = os.path.getsize(filepath) / (1024 * 1024)
+                os.remove(filepath)
+                deleted += 1
+                freed_mb += size_mb
+            except:
+                pass
+        
+        logger.info(f"Emergency cleanup: deleted {deleted} files, freed {freed_mb:.1f}MB")
+        return freed_mb
+    except Exception as e:
+        logger.error(f"Emergency cleanup failed: {e}")
+        return 0
 
 def get_video_duration(file_path):
     try:
@@ -146,6 +201,20 @@ def validate_cookies():
         return False, f"Error reading cookies: {str(e)}"
 
 def download_and_convert(url, file_id):
+    # Check disk space BEFORE starting download
+    if ENABLE_DISK_SPACE_MONITORING:
+        has_space, free_mb = check_disk_space()
+        if not has_space:
+            logger.warning(f"Low disk space ({free_mb:.0f}MB), attempting cleanup...")
+            freed_mb = clean_tmp_immediately()
+            has_space, free_mb = check_disk_space()
+            if not has_space:
+                update_status(file_id, {
+                    'status': 'failed',
+                    'progress': f'Server storage full ({free_mb:.0f}MB free). Please try again in a few minutes after cleanup.'
+                })
+                return
+    
     update_status(file_id, {
         'status': 'downloading',
         'progress': 'Downloading video from YouTube... (this may take several minutes for long videos)',
@@ -164,7 +233,6 @@ def download_and_convert(url, file_id):
             'outtmpl': temp_video,
             'max_filesize': MAX_FILESIZE,
             'nocheckcertificate': True,
-            'force_ipv4': True,
             'retries': 15,
             'retry_sleep': 3,
             'fragment_retries': 15,
@@ -179,53 +247,84 @@ def download_and_convert(url, file_id):
             'logger': logger,
         }
         
-        # Download strategies - using Python dict instead of command args
+        # YouTube IP block bypass: Use IPv6 if enabled (less blocked by YouTube)
+        if USE_IPV6:
+            base_opts['force_ipv6'] = True
+            logger.info(f"Using IPv6 for download (IP block bypass)")
+        else:
+            base_opts['force_ipv4'] = True
+        
+        # Add proxy if configured (bypass cloud IP blocks)
+        if PROXY_URL:
+            base_opts['proxy'] = PROXY_URL
+            logger.info(f"Using proxy for download (IP block bypass)")
+        
+        # Add rate limiting if configured (avoid 429 errors)
+        if RATE_LIMIT_BYTES > 0:
+            base_opts['ratelimit'] = RATE_LIMIT_BYTES
+            logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
+        
+        # Download strategies - Enhanced with better IP block bypass
+        # These strategies mimic real devices to avoid detection
         strategies = [
             {
-                'name': 'Android TV',
+                'name': 'Android TV (Best for Cloud IPs)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['android_embedded', 'android', 'ios'],
+                        'player_client': ['android_embedded', 'android_creator', 'android'],
                         'player_skip': ['webpage', 'configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.02.39 (Linux; U; Android 13; Pixel 7) gzip'
+                        'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 14; en_US) gzip',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'gzip, deflate',
+                        'Accept-Language': 'en-US,en;q=0.9'
                     }
                 }
             },
             {
-                'name': 'iOS',
+                'name': 'iOS App (Anti-Bot)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['ios', 'android'],
+                        'player_client': ['ios', 'ios_creator', 'android'],
                         'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.ios.youtube/19.02.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)'
+                        'User-Agent': 'com.google.ios.youtube/19.09.3 (iPhone16,2; U; CPU iOS 17_0 like Mac OS X)',
+                        'Accept': '*/*',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Accept-Language': 'en-US,en;q=0.9'
                     }
                 }
             },
             {
-                'name': 'Android Mobile',
+                'name': 'Android Mobile (Fallback)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['android', 'web'],
+                        'player_client': ['android', 'android_music', 'web'],
                         'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Referer': 'https://www.youtube.com/'
                     }
                 }
             },
             {
-                'name': 'Web Embedded',
+                'name': 'Web Embedded (Last Resort)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['web_embedded', 'web'],
+                        'player_client': ['web_embedded', 'web_creator', 'web'],
                         'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Referer': 'https://www.youtube.com/',
+                        'Origin': 'https://www.youtube.com'
                     }
                 }
             }
@@ -265,7 +364,15 @@ def download_and_convert(url, file_id):
                     
             except yt_dlp.utils.DownloadError as e:
                 last_error = str(e)
-                logger.error(f"{strategy['name']} download error for {file_id}: {last_error}")
+                error_lower = last_error.lower()
+                
+                # Detect IP blocking specifically
+                if '403' in last_error or 'forbidden' in error_lower or 'bot' in error_lower:
+                    logger.warning(f"⚠️ Possible IP block detected with {strategy['name']}: {last_error[:200]}")
+                    # Add extra delay when IP blocked
+                    time.sleep(5)
+                else:
+                    logger.error(f"{strategy['name']} download error for {file_id}: {last_error}")
                 continue
             except Exception as e:
                 last_error = str(e)
@@ -274,8 +381,15 @@ def download_and_convert(url, file_id):
         
         if not download_success:
             error_msg = last_error if last_error else "All download strategies failed"
+            error_lower = error_msg.lower()
             
-            if 'duration' in error_msg.lower():
+            # Enhanced error detection for IP blocking
+            if '403' in error_msg or 'forbidden' in error_lower:
+                raise Exception("⚠️ YouTube IP BLOCK detected! This happens when YouTube blocks your server's IP address. Solutions: 1) Upload cookies from /cookies page, 2) Set USE_IPV6=true in environment, 3) Configure PROXY_URL, or 4) Try a different hosting platform. See documentation for details.")
+            if 'bot' in error_lower and ('sign in' in error_lower or 'confirm' in error_lower):
+                raise Exception("⚠️ YouTube bot detection triggered! Upload cookies from /cookies page or wait 10-15 minutes before trying again. See ERROR_GUIDE.md for solutions.")
+            
+            if 'duration' in error_lower:
                 raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
             if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
                 raise Exception(f"Video file too large (limit: {MAX_FILESIZE})")
@@ -309,6 +423,14 @@ def download_and_convert(url, file_id):
         
         file_size = os.path.getsize(temp_video)
         file_size_mb = file_size / (1024 * 1024)
+        
+        # Check disk space AGAIN before conversion (video might be large)
+        if ENABLE_DISK_SPACE_MONITORING:
+            has_space, free_mb = check_disk_space()
+            if free_mb < (file_size_mb * 1.5):  # Need ~1.5x video size for conversion
+                logger.warning(f"Insufficient space for conversion: {free_mb:.0f}MB free, need ~{file_size_mb*1.5:.0f}MB")
+                os.remove(temp_video)
+                raise Exception(f"Insufficient disk space for conversion. Downloaded video is {file_size_mb:.1f}MB but only {free_mb:.0f}MB free. Try a shorter video.")
         
         est_time = max(1, int(duration / 60))
         update_status(file_id, {
