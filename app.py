@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
+import yt_dlp
 
 # Configure logging
 logging.basicConfig(
@@ -156,66 +157,89 @@ def download_and_convert(url, file_id):
     temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
     
     try:
-        base_cmd = [
-            'yt-dlp',
-            '-f', 'worst/best',
-            '--merge-output-format', 'mp4',
-            '-o', temp_video,
-            '--max-filesize', MAX_FILESIZE,
-            '--no-check-certificates',
-            '--force-ipv4',
-            '--retries', '15',
-            '--retry-sleep', '3',
-            '--fragment-retries', '15',
-            '--sleep-requests', '1',
-            '--concurrent-fragments', '1',
-            '--no-abort-on-error',
-            '--extractor-retries', '10',
-            '--socket-timeout', '30',
-            '--http-chunk-size', '10M'
-        ]
+        # Base yt-dlp options (using Python API instead of subprocess)
+        base_opts = {
+            'format': 'worst/best',
+            'merge_output_format': 'mp4',
+            'outtmpl': temp_video,
+            'max_filesize': MAX_FILESIZE,
+            'nocheckcertificate': True,
+            'force_ipv4': True,
+            'retries': 15,
+            'retry_sleep': 3,
+            'fragment_retries': 15,
+            'sleep_requests': 1,
+            'concurrent_fragment_downloads': 1,
+            'ignoreerrors': False,
+            'extractor_retries': 10,
+            'socket_timeout': 30,
+            'http_chunk_size': 10485760,  # 10MB
+            'quiet': False,
+            'no_warnings': False,
+            'logger': logger,
+        }
         
+        # Download strategies - using Python dict instead of command args
         strategies = [
             {
                 'name': 'Android TV',
-                'args': [
-                    '--extractor-args', 'youtube:player_client=android_embedded,android,ios;player_skip=webpage,configs',
-                    '--user-agent', 'com.google.android.youtube/19.02.39 (Linux; U; Android 13; Pixel 7) gzip'
-                ]
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android_embedded', 'android', 'ios'],
+                        'player_skip': ['webpage', 'configs']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.android.youtube/19.02.39 (Linux; U; Android 13; Pixel 7) gzip'
+                    }
+                }
             },
             {
                 'name': 'iOS',
-                'args': [
-                    '--extractor-args', 'youtube:player_client=ios,android;player_skip=webpage',
-                    '--user-agent', 'com.google.ios.youtube/19.02.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)'
-                ]
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['ios', 'android'],
+                        'player_skip': ['webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.ios.youtube/19.02.3 (iPhone14,3; U; CPU iOS 16_0 like Mac OS X)'
+                    }
+                }
             },
             {
                 'name': 'Android Mobile',
-                'args': [
-                    '--extractor-args', 'youtube:player_client=android,web;player_skip=configs',
-                    '--user-agent', 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
-                ]
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android', 'web'],
+                        'player_skip': ['configs']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+                    }
+                }
             },
             {
                 'name': 'Web Embedded',
-                'args': [
-                    '--extractor-args', 'youtube:player_client=web_embedded,web;player_skip=webpage',
-                    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                ]
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['web_embedded', 'web'],
+                        'player_skip': ['webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
+                }
             }
         ]
         
+        # Add cookies if available
         if has_cookies():
-            base_cmd.extend(['--cookies', COOKIES_FILE])
+            base_opts['cookiefile'] = COOKIES_FILE
         
-        result = None
         last_error = None
+        download_success = False
         
         for i, strategy in enumerate(strategies):
             try:
-                download_cmd = base_cmd + strategy['args'] + [url]
-                
                 if i > 0:
                     update_status(file_id, {
                         'status': 'downloading',
@@ -223,21 +247,32 @@ def download_and_convert(url, file_id):
                     })
                     time.sleep(3 * i)
                 
-                result = subprocess.run(download_cmd, capture_output=True, text=True, timeout=DOWNLOAD_TIMEOUT)
+                # Merge strategy options with base options
+                ydl_opts = {**base_opts, **strategy['opts']}
                 
-                if result.returncode == 0 and os.path.exists(temp_video):
+                logger.info(f"Attempting download with {strategy['name']} strategy for {file_id}")
+                
+                # Use yt-dlp Python API instead of subprocess
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info_dict = ydl.extract_info(url, download=True)
+                    
+                if os.path.exists(temp_video) and os.path.getsize(temp_video) > 0:
+                    logger.info(f"Download successful with {strategy['name']} for {file_id}")
+                    download_success = True
                     break
                 else:
-                    last_error = result.stderr
+                    logger.warning(f"{strategy['name']} strategy failed - file not created or empty")
                     
-            except subprocess.TimeoutExpired:
-                last_error = "Download timeout"
+            except yt_dlp.utils.DownloadError as e:
+                last_error = str(e)
+                logger.error(f"{strategy['name']} download error for {file_id}: {last_error}")
                 continue
             except Exception as e:
                 last_error = str(e)
+                logger.error(f"{strategy['name']} unexpected error for {file_id}: {last_error}")
                 continue
         
-        if not result or result.returncode != 0:
+        if not download_success:
             error_msg = last_error if last_error else "All download strategies failed"
             
             if 'duration' in error_msg.lower():
