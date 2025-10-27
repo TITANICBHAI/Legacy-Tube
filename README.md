@@ -8,13 +8,22 @@ Convert YouTube videos to 3GP format optimized for feature phones like Nokia 531
 
 ## ✨ Features
 
+### Core Features
+- **Works Without Cookies** - 4 automatic fallback strategies for YouTube downloads
 - **No JavaScript** - Works on Opera Mini 4.4 and older browsers
 - **Ultra-Low Bitrate** - Optimized for 2G networks (176x144 resolution)
 - **Long Videos** - Supports up to 6 hours of video
 - **Auto Cleanup** - Files deleted after 6 hours
 - **Free Forever** - No API keys, no ads, completely free
 - **Time Estimates** - Shows processing time from the start (no guessing!)
-- **Rate Limit Protection** - Built-in workarounds for YouTube 429 errors on shared hosting
+
+### Advanced Features
+- **Multi-Strategy Downloads** - Android TV → iOS → Android Mobile → Web Embedded clients
+- **Rate Limit Protection** - Progressive retry with exponential backoff
+- **Memory Optimized** - Runs perfectly on Render's 512MB free tier
+- **Health Monitoring** - `/health` endpoint for uptime checks
+- **Graceful Shutdown** - Automatic cleanup on container restart
+- **Cookie Authentication** - Optional cookie support for restricted videos (see `/cookies` page)
 
 ## 📊 Technical Details
 
@@ -26,16 +35,44 @@ Convert YouTube videos to 3GP format optimized for feature phones like Nokia 531
 - **Max File Size**: 500 MB
 - **File Size**: ~2-3 MB per 5 minutes
 
-## 🚀 Quick Deploy to Render.com
+## 🚀 Deployment Options
+
+### Option 1: Render.com (Recommended - Free Tier)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com)
 
+**Quick Setup (5 minutes):**
 1. Push this repo to GitHub
-2. Create account on Render.com (free)
+2. Create account on Render.com (free, no credit card)
 3. Click "New Web Service" → Connect GitHub repo
 4. Render auto-detects `render.yaml` and deploys!
 
-See [DEPLOY.md](DEPLOY.md) for detailed instructions.
+**📖 Deployment Guides:**
+- **[RENDER_MANUAL_SETUP.md](RENDER_MANUAL_SETUP.md)** - Complete step-by-step manual for every option (beginners start here!)
+- **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)** - Free tier optimization guide and troubleshooting
+- **[DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)** - Quick overview of all improvements
+
+### Option 2: Docker (Any Platform)
+
+**Using Docker Compose:**
+```bash
+docker-compose up --build
+```
+
+**Manual Docker:**
+```bash
+docker build -t youtube-3gp .
+docker run -p 5000:5000 youtube-3gp
+```
+
+**📖 Documentation:**
+- **[DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md)** - Complete Docker guide with advanced options
+- **[Dockerfile](Dockerfile)** - Production-ready, multi-stage build
+- **[docker-compose.yml](docker-compose.yml)** - Local testing setup
+
+### Option 3: Native Python (Advanced)
+
+See **[DEPLOY.md](DEPLOY.md)** for traditional deployment instructions.
 
 ## 🖥️ Local Development
 
@@ -56,15 +93,26 @@ Visit `http://localhost:5000`
 
 ```
 .
-├── app.py              # Main Flask application
-├── templates/          # HTML templates (feature phone optimized)
-│   ├── base.html
-│   ├── index.html
-│   └── status.html
-├── requirements.txt    # Python dependencies
-├── render.yaml         # Render deployment config
-├── build.sh           # Build script for Render
-└── DEPLOY.md          # Deployment guide
+├── app.py                      # Main Flask application
+├── templates/                  # HTML templates (feature phone optimized)
+│   ├── base.html              # Base template with minimal CSS
+│   ├── index.html             # Homepage with URL input
+│   ├── status.html            # Conversion progress page
+│   └── cookies.html           # Cookie management page
+├── requirements.txt           # Python dependencies
+├── Dockerfile                 # Production Docker image
+├── docker-compose.yml         # Local Docker testing
+├── .dockerignore             # Docker build optimization
+├── .env.example              # Environment variables template
+├── render.yaml               # Render deployment config
+├── build.sh                  # Build script for Render
+└── Documentation/
+    ├── RENDER_MANUAL_SETUP.md    # Step-by-step Render guide (START HERE!)
+    ├── RENDER_DEPLOYMENT.md      # Render optimization guide
+    ├── DOCKER_DEPLOYMENT.md      # Docker setup guide
+    ├── DEPLOYMENT_SUMMARY.md     # Quick overview
+    ├── COOKIE_SETUP_GUIDE.md     # Optional cookie authentication
+    └── DEPLOY.md                 # General deployment guide
 ```
 
 ## ⚙️ Environment Variables
