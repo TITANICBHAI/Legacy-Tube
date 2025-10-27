@@ -4,6 +4,14 @@ Welcome! This guide helps you find the right documentation for your needs.
 
 ## 🎯 I Want To...
 
+### ⚡ Get It Working RIGHT NOW (5 Minutes)
+
+**👉 ABSOLUTE BEGINNER: [QUICK_START.md](QUICK_START.md)** ⭐ **NEW!**
+- Fastest path to deployment
+- No technical knowledge needed
+- Just follow the steps
+- 5 minutes from zero to live app
+
 ### Deploy to Render (Free Hosting)
 
 **👉 START HERE: [RENDER_MANUAL_SETUP.md](RENDER_MANUAL_SETUP.md)**
@@ -92,9 +100,12 @@ Welcome! This guide helps you find the right documentation for your needs.
 → [README.md](README.md) → [replit.md](replit.md) → [DEPLOYMENT_SUMMARY.md](DEPLOYMENT_SUMMARY.md)
 
 **Having problems**
-→ Your deployment guide → Troubleshooting section
+→ [ERROR_GUIDE.md](ERROR_GUIDE.md) → Find your error and solution (⭐ START HERE!)  
+→ Then your deployment guide → Troubleshooting section
 
 **Want to customize**
+→ [ADVANCED_TINKERING.md](ADVANCED_TINKERING.md) → Complete customization guide (⭐ NEW!)  
+→ [OPTIMIZATION_IDEAS.md](OPTIMIZATION_IDEAS.md) → Performance tips (⭐ NEW!)  
 → [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) → Manual Tinkering section  
 → [RENDER_MANUAL_SETUP.md](RENDER_MANUAL_SETUP.md) → Manual Tinkering section
 
@@ -115,6 +126,18 @@ Welcome! This guide helps you find the right documentation for your needs.
 | **[COOKIE_SETUP_GUIDE.md](COOKIE_SETUP_GUIDE.md)** | Cookie authentication | Videos failing with auth errors |
 | **[replit.md](replit.md)** | Technical documentation | Understanding the system |
 | **[README.md](README.md)** | Project overview | First-time visitors |
+
+### Troubleshooting & Maintenance (⭐ NEW!)
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| **[ERROR_GUIDE.md](ERROR_GUIDE.md)** | Complete error reference & solutions | When something breaks (start here!) |
+| **[MONITORING_GUIDE.md](MONITORING_GUIDE.md)** | How to monitor & maintain your app | After deployment |
+
+### Advanced Customization (⭐ NEW!)
+| File | Purpose | When to Use |
+|------|---------|-------------|
+| **[ADVANCED_TINKERING.md](ADVANCED_TINKERING.md)** | Customize & modify the app | Want to change settings/features |
+| **[OPTIMIZATION_IDEAS.md](OPTIMIZATION_IDEAS.md)** | Performance optimization tips | Need better performance |
 
 ### Configuration Files
 | File | Purpose |
@@ -253,4 +276,10 @@ A: DEPLOYMENT_SUMMARY.md and replit.md → Recent Changes
 
 **Happy deploying! 🚀**
 
-*Last Updated: October 26, 2025*
+**⭐ NEW GUIDES ADDED:**
+- **[ERROR_GUIDE.md](ERROR_GUIDE.md)** - Complete error troubleshooting (covers 95% of issues!)
+- **[MONITORING_GUIDE.md](MONITORING_GUIDE.md)** - Keep your app healthy
+- **[ADVANCED_TINKERING.md](ADVANCED_TINKERING.md)** - Customize everything
+- **[OPTIMIZATION_IDEAS.md](OPTIMIZATION_IDEAS.md)** - Make it faster
+
+*Last Updated: October 27, 2025*

@@ -50,6 +50,12 @@ The application features ultra-lightweight HTML templates designed for feature p
 
 ## External Dependencies
 - **yt-dlp**: Python library for downloading videos from YouTube and other sites.
-- **FFmpeg**: Open-source multimedia framework for video and audio conversion.
+- **FFmpeg**: Open-source multimedia framework for video and audio conversion. **Note**: Render's native environment includes ffmpeg pre-installed (v4.1.11-0), so no custom binaries needed.
 - **Flask**: Python web framework used for the backend.
 - **Gunicorn**: WSGI HTTP Server for UNIX (used in production deployments).
+
+## Documentation
+- **RENDER_DEPLOYMENT.md**: Comprehensive guide for deploying to Render's free tier
+- **DOCKER_DEPLOYMENT.md**: Docker deployment instructions and optimizations
+- **COOKIE_SETUP_GUIDE.md**: Instructions for setting up YouTube cookies
+- **ADVANCED_TINKERING.md**: Advanced customization guide for developers who want to modify settings, optimize performance, or add new features

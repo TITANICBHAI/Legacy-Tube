@@ -5,9 +5,17 @@ import threading
 import json
 import signal
 import sys
+import logging
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-change-in-production')
@@ -299,7 +307,31 @@ def download_and_convert(url, file_id):
                 pass
         
         if result.returncode != 0:
-            raise Exception(f"Conversion failed: {result.stderr[:200]}")
+            error_msg = result.stderr[:300] if result.stderr else "Unknown FFmpeg error"
+            logger.error(f"FFmpeg conversion failed for {file_id}: {error_msg}")
+            
+            # Retry once with simpler encoding if first attempt fails
+            logger.info(f"Retrying conversion with simpler settings for {file_id}")
+            simple_cmd = [
+                'ffmpeg',
+                '-i', temp_video,
+                '-s', '176x144',
+                '-vcodec', 'mpeg4',
+                '-r', '12',
+                '-b:v', '200k',
+                '-acodec', 'aac',
+                '-ar', '16000',
+                '-b:a', '32000',
+                '-ac', '1',
+                '-threads', '1',
+                '-y',
+                output_path
+            ]
+            
+            retry_result = subprocess.run(simple_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
+            
+            if retry_result.returncode != 0:
+                raise Exception(f"Conversion failed after retry: {error_msg}")
         
         if not os.path.exists(output_path):
             raise Exception("Conversion failed: Output file not created")
@@ -317,6 +349,7 @@ def download_and_convert(url, file_id):
         })
         
     except subprocess.TimeoutExpired:
+        logger.error(f"Timeout processing {file_id}")
         update_status(file_id, {
             'status': 'failed',
             'progress': 'Error: Processing timeout. Video may be too long or server is busy. Try a shorter video.'
@@ -327,6 +360,7 @@ def download_and_convert(url, file_id):
             except:
                 pass
     except Exception as e:
+        logger.error(f"Error processing {file_id}: {str(e)}")
         update_status(file_id, {
             'status': 'failed',
             'progress': f'Error: {str(e)}'
@@ -334,6 +368,13 @@ def download_and_convert(url, file_id):
         if os.path.exists(temp_video):
             try:
                 os.remove(temp_video)
+            except:
+                pass
+        
+        # Cleanup output if partially created
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
             except:
                 pass
 

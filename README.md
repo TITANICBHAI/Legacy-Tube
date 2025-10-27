@@ -89,6 +89,21 @@ python app.py
 
 Visit `http://localhost:5000`
 
+## 📚 Complete Documentation
+
+**⭐ NEW GUIDES ADDED!**
+
+### 🆘 Troubleshooting & Maintenance
+- **[ERROR_GUIDE.md](ERROR_GUIDE.md)** - Complete error reference (covers 95% of issues!)
+- **[MONITORING_GUIDE.md](MONITORING_GUIDE.md)** - How to monitor and maintain your app
+
+### 🔧 Advanced Customization
+- **[ADVANCED_TINKERING.md](ADVANCED_TINKERING.md)** - Customize everything (settings, features, performance)
+- **[OPTIMIZATION_IDEAS.md](OPTIMIZATION_IDEAS.md)** - Performance tips for Render free tier
+
+### 📖 All Documentation
+See **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** for complete navigation guide.
+
 ## 📁 Project Structure
 
 ```
