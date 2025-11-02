@@ -53,6 +53,54 @@ MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))
 ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 'true').lower() == 'true'
 DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 1500))  # Alert when < 1.5GB free
 
+# Detect FFmpeg path (for Render free tier compatibility)
+def get_ffmpeg_path():
+    """Find FFmpeg binary - checks multiple locations for Render compatibility"""
+    possible_paths = [
+        'ffmpeg',  # System PATH
+        '/opt/bin/ffmpeg',  # Static binary location
+        '/usr/bin/ffmpeg',  # Standard location
+        '/usr/local/bin/ffmpeg',  # Alternative location
+    ]
+    
+    for path in possible_paths:
+        try:
+            result = subprocess.run([path, '-version'], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                logger.info(f"FFmpeg found at: {path}")
+                return path
+        except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
+            continue
+    
+    logger.error("FFmpeg not found in any expected location!")
+    return 'ffmpeg'  # Fallback to system PATH
+
+def get_ffprobe_path():
+    """Find FFprobe binary - checks multiple locations for Render compatibility"""
+    possible_paths = [
+        'ffprobe',  # System PATH
+        '/opt/bin/ffprobe',  # Static binary location
+        '/usr/bin/ffprobe',  # Standard location
+        '/usr/local/bin/ffprobe',  # Alternative location
+    ]
+    
+    for path in possible_paths:
+        try:
+            result = subprocess.run([path, '-version'], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                logger.info(f"FFprobe found at: {path}")
+                return path
+        except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
+            continue
+    
+    logger.warning("FFprobe not found, using ffmpeg for duration detection")
+    return 'ffprobe'  # Fallback to system PATH
+
+FFMPEG_PATH = get_ffmpeg_path()
+FFPROBE_PATH = get_ffprobe_path()
+logger.info(f"Using FFmpeg: {FFMPEG_PATH}")
+logger.info(f"Using FFprobe: {FFPROBE_PATH}")
+
 status_lock = threading.Lock()
 
 def get_status():
@@ -144,7 +192,7 @@ def clean_tmp_immediately():
 def get_video_duration(file_path):
     try:
         cmd = [
-            'ffprobe',
+            FFPROBE_PATH,
             '-v', 'error',
             '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1',
@@ -200,7 +248,7 @@ def validate_cookies():
     except Exception as e:
         return False, f"Error reading cookies: {str(e)}"
 
-def download_and_convert(url, file_id):
+def download_and_convert(url, file_id, output_format='3gp'):
     # Check disk space BEFORE starting download
     if ENABLE_DISK_SPACE_MONITORING:
         has_space, free_mb = check_disk_space()
@@ -215,14 +263,17 @@ def download_and_convert(url, file_id):
                 })
                 return
     
+    file_extension = 'mp3' if output_format == 'mp3' else '3gp'
+    format_name = 'MP3 audio' if output_format == 'mp3' else '3GP video'
+    
     update_status(file_id, {
         'status': 'downloading',
-        'progress': 'Downloading video from YouTube... (this may take several minutes for long videos)',
+        'progress': f'Downloading from YouTube for {format_name} conversion... (this may take several minutes for long videos)',
         'url': url,
         'timestamp': datetime.now().isoformat()
     })
     
-    output_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+    output_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.{file_extension}')
     temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
     
     try:
@@ -433,35 +484,54 @@ def download_and_convert(url, file_id):
                 raise Exception(f"Insufficient disk space for conversion. Downloaded video is {file_size_mb:.1f}MB but only {free_mb:.0f}MB free. Try a shorter video.")
         
         est_time = max(1, int(duration / 60))
-        update_status(file_id, {
-            'status': 'converting',
-            'progress': f'Converting to 3GP format... Video: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
-        })
         
-        convert_cmd = [
-            'ffmpeg',
-            '-i', temp_video,
-            '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
-            '-vcodec', 'mpeg4',
-            '-r', '12',
-            '-b:v', '300k',
-            '-acodec', 'aac',
-            '-ar', '22050',
-            '-b:a', '48000',
-            '-ac', '1',
-            '-threads', '1',
-            '-y',
-            output_path
-        ]
+        if output_format == 'mp3':
+            update_status(file_id, {
+                'status': 'converting',
+                'progress': f'Converting to MP3 audio... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
+            })
+            
+            # Optimized MP3 conversion for feature phones
+            convert_cmd = [
+                FFMPEG_PATH,
+                '-i', temp_video,
+                '-vn',  # No video
+                '-acodec', 'libmp3lame',
+                '-ar', '22050',  # Sample rate optimized for voice/music balance
+                '-b:a', '48k',  # Bitrate for good quality at small size
+                '-ac', '1',  # Mono
+                '-q:a', '4',  # Quality setting (VBR mode)
+                '-threads', '1',
+                '-y',
+                output_path
+            ]
+        else:
+            update_status(file_id, {
+                'status': 'converting',
+                'progress': f'Converting to 3GP video... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
+            })
+            
+            # Optimized 3GP conversion - better quality, smaller size
+            convert_cmd = [
+                FFMPEG_PATH,
+                '-i', temp_video,
+                '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
+                '-vcodec', 'mpeg4',
+                '-r', '12',
+                '-b:v', '200k',  # Reduced from 300k for smaller files
+                '-maxrate', '250k',  # Maximum bitrate cap
+                '-bufsize', '500k',  # Buffer size for rate control
+                '-acodec', 'aac',
+                '-ar', '16000',  # Reduced from 22050 for smaller files
+                '-b:a', '24k',  # Reduced from 48k for smaller files
+                '-ac', '1',
+                '-threads', '1',
+                '-y',
+                output_path
+            ]
         
         dynamic_timeout = max(CONVERSION_TIMEOUT, int(duration * 2))
         result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
-        
-        if os.path.exists(temp_video):
-            try:
-                os.remove(temp_video)
-            except:
-                pass
         
         if result.returncode != 0:
             error_msg = result.stderr[:300] if result.stderr else "Unknown FFmpeg error"
@@ -469,26 +539,54 @@ def download_and_convert(url, file_id):
             
             # Retry once with simpler encoding if first attempt fails
             logger.info(f"Retrying conversion with simpler settings for {file_id}")
-            simple_cmd = [
-                'ffmpeg',
-                '-i', temp_video,
-                '-s', '176x144',
-                '-vcodec', 'mpeg4',
-                '-r', '12',
-                '-b:v', '200k',
-                '-acodec', 'aac',
-                '-ar', '16000',
-                '-b:a', '32000',
-                '-ac', '1',
-                '-threads', '1',
-                '-y',
-                output_path
-            ]
+            
+            if output_format == 'mp3':
+                simple_cmd = [
+                    FFMPEG_PATH,
+                    '-i', temp_video,
+                    '-vn',
+                    '-acodec', 'libmp3lame',
+                    '-ar', '16000',
+                    '-b:a', '32k',
+                    '-ac', '1',
+                    '-threads', '1',
+                    '-y',
+                    output_path
+                ]
+            else:
+                simple_cmd = [
+                    FFMPEG_PATH,
+                    '-i', temp_video,
+                    '-s', '176x144',
+                    '-vcodec', 'mpeg4',
+                    '-r', '12',
+                    '-b:v', '150k',
+                    '-acodec', 'aac',
+                    '-ar', '16000',
+                    '-b:a', '24k',
+                    '-ac', '1',
+                    '-threads', '1',
+                    '-y',
+                    output_path
+                ]
             
             retry_result = subprocess.run(simple_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
             
             if retry_result.returncode != 0:
+                # Clean up temp file before raising exception
+                if os.path.exists(temp_video):
+                    try:
+                        os.remove(temp_video)
+                    except:
+                        pass
                 raise Exception(f"Conversion failed after retry: {error_msg}")
+        
+        # Clean up temp video after successful conversion
+        if os.path.exists(temp_video):
+            try:
+                os.remove(temp_video)
+            except:
+                pass
         
         if not os.path.exists(output_path):
             raise Exception("Conversion failed: Output file not created")
@@ -496,10 +594,13 @@ def download_and_convert(url, file_id):
         final_size = os.path.getsize(output_path)
         final_size_mb = final_size / (1024 * 1024)
         
+        # Use correct filename extension based on format
+        filename_with_ext = f'{file_id}.{file_extension}'
+        
         update_status(file_id, {
             'status': 'completed',
             'progress': f'Conversion complete! Duration: {duration/60:.1f} min, File size: {final_size_mb:.2f} MB',
-            'filename': f'{file_id}.3gp',
+            'filename': filename_with_ext,
             'file_size': final_size,
             'duration': duration,
             'completed_at': datetime.now().isoformat()
@@ -640,6 +741,7 @@ def health():
 @app.route('/convert', methods=['POST'])
 def convert():
     url = request.form.get('url', '').strip()
+    output_format = request.form.get('format', '3gp').strip()
     
     if not url:
         flash('Please enter a YouTube URL')
@@ -649,9 +751,12 @@ def convert():
         flash('Please enter a valid YouTube URL')
         return redirect(url_for('index'))
     
+    if output_format not in ['3gp', 'mp3']:
+        output_format = '3gp'
+    
     file_id = generate_file_id(url)
     
-    thread = threading.Thread(target=download_and_convert, args=(url, file_id))
+    thread = threading.Thread(target=download_and_convert, args=(url, file_id, output_format))
     thread.daemon = True
     thread.start()
     
@@ -665,13 +770,62 @@ def status(file_id):
 
 @app.route('/download/<file_id>')
 def download(file_id):
-    file_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+    # Check for both 3gp and mp3 files
+    file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+    file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
     
-    if not os.path.exists(file_path):
+    if os.path.exists(file_path_3gp):
+        return send_file(file_path_3gp, as_attachment=True, download_name=f'video_{file_id}.3gp')
+    elif os.path.exists(file_path_mp3):
+        return send_file(file_path_mp3, as_attachment=True, download_name=f'audio_{file_id}.mp3')
+    else:
         flash('File not found or has been deleted')
         return redirect(url_for('index'))
+
+@app.route('/search', methods=['GET', 'POST'])
+def search():
+    if request.method == 'POST':
+        query = request.form.get('query', '').strip()
+        
+        if not query:
+            flash('Please enter a search term')
+            return redirect(url_for('search'))
+        
+        try:
+            # Use yt-dlp to search YouTube (no API key required)
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'extract_flat': True,
+                'force_generic_extractor': False,
+            }
+            
+            results = []
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Search for up to 10 results
+                search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
+                
+                if search_results and 'entries' in search_results:
+                    for entry in search_results['entries']:
+                        if entry:
+                            duration = entry.get('duration', 0)
+                            duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
+                            
+                            results.append({
+                                'title': entry.get('title', 'Unknown'),
+                                'url': entry.get('url', '') if entry.get('url', '').startswith('http') else f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                                'duration': duration_str,
+                                'duration_seconds': duration,
+                            })
+            
+            return render_template('search.html', results=results, query=query)
+            
+        except Exception as e:
+            logger.error(f"Search error: {str(e)}")
+            flash(f'Search failed: {str(e)}')
+            return redirect(url_for('search'))
     
-    return send_file(file_path, as_attachment=True, download_name=f'video_{file_id}.3gp')
+    return render_template('search.html', results=None, query='')
 
 @app.route('/cookies', methods=['GET', 'POST'])
 def cookies_page():

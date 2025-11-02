@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Search YouTube - Feature Phone{% endblock %}
+
+{% block content %}
+<h1>Search YouTube</h1>
+
+<form method="POST" action="/search">
+<p><strong>Search for videos:</strong></p>
+<input type="text" name="query" placeholder="Enter search term..." value="{{ query }}" required>
+<button type="submit">Search</button>
+</form>
+
+<p class="center"><a href="/">Back to Converter</a></p>
+
+<hr>
+
+{% if results is not none %}
+  {% if results|length > 0 %}
+    <div class="info">
+    <h2>Results for "{{ query }}":</h2>
+    </div>
+    
+    {% for video in results %}
+    <div class="status">
+    <p><strong>{{ loop.index }}. {{ video.title }}</strong></p>
+    <p>Duration: {{ video.duration }}</p>
+    
+    <form method="POST" action="/convert" style="margin: 5px 0;">
+    <input type="hidden" name="url" value="{{ video.url }}">
+    <p style="margin: 5px 0;">
+    <input type="radio" name="format" value="3gp" id="v{{ loop.index }}_3gp" checked>
+    <label for="v{{ loop.index }}_3gp">3GP</label>
+    <input type="radio" name="format" value="mp3" id="v{{ loop.index }}_mp3">
+    <label for="v{{ loop.index }}_mp3">MP3</label>
+    </p>
+    <button type="submit">Convert This</button>
+    </form>
+    </div>
+    {% endfor %}
+    
+  {% else %}
+    <div class="error">
+    <p>No results found for "{{ query }}"</p>
+    <p>Try different search terms</p>
+    </div>
+  {% endif %}
+{% else %}
+  <div class="info">
+  <h2>How to search:</h2>
+  <ul>
+  <li>Enter song, artist, or video name</li>
+  <li>Shows title and duration</li>
+  <li>Choose format and convert</li>
+  <li>Works without YouTube API</li>
+  </ul>
+  </div>
+{% endif %}
+
+{% endblock %}

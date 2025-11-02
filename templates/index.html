@@ -1,16 +1,34 @@
 {% extends "base.html" %}
 
-{% block title %}YouTube to 3GP - Feature Phone Converter{% endblock %}
+{% block title %}YouTube Converter - Feature Phone{% endblock %}
 
 {% block content %}
-<h1>YouTube to 3GP</h1>
+<h1>YouTube Converter</h1>
 <p class="center"><strong>For Feature Phones</strong></p>
 
 <form method="POST" action="/convert">
 <p><strong>Paste YouTube URL:</strong></p>
 <input type="text" name="url" placeholder="https://www.youtube.com/watch?v=..." required>
-<button type="submit">Convert to 3GP</button>
+
+<p><strong>Select Format:</strong></p>
+<p style="margin: 5px 0;">
+<input type="radio" name="format" value="3gp" id="fmt_3gp" checked>
+<label for="fmt_3gp">3GP Video (176x144)</label>
+</p>
+<p style="margin: 5px 0;">
+<input type="radio" name="format" value="mp3" id="fmt_mp3">
+<label for="fmt_mp3">MP3 Audio Only</label>
+</p>
+
+<button type="submit">Start Conversion</button>
 </form>
+
+<hr>
+
+<div class="info">
+<p class="center"><strong>Or Search YouTube:</strong></p>
+<p class="center"><a href="/search" class="button" style="margin: 0;">Search Videos</a></p>
+</div>
 
 <hr>
 
@@ -18,37 +36,46 @@
 <h2>How it works:</h2>
 <ul>
 <li>Paste any YouTube URL</li>
-<li>Video converts to 3GP format</li>
+<li>Choose 3GP video or MP3 audio</li>
 <li>Download works on 2G networks</li>
 <li>Perfect for Nokia phones</li>
 </ul>
 </div>
 
 <div class="info">
-<h2>Video Details:</h2>
+<h2>Format Details:</h2>
+<p><strong>3GP Video:</strong></p>
 <ul>
-<li>Max length: Up to {{ max_hours|int }} hours</li>
-<li>Max file size: 500 MB</li>
 <li>Resolution: 176x144</li>
-<li>Format: 3GP</li>
-<li>Output: ~2-3 MB per 5 min</li>
+<li>Size: ~1-2 MB per 5 min</li>
+<li>Better quality, smaller size</li>
+</ul>
+<p><strong>MP3 Audio:</strong></p>
+<ul>
+<li>Audio only: 48kbps</li>
+<li>Size: ~2 MB per 5 min</li>
+<li>Great for music/podcasts</li>
+</ul>
+<p><strong>Both formats:</strong></p>
+<ul>
+<li>Max length: {{ max_hours|int }} hours</li>
 <li>Files auto-delete after 6 hours</li>
 </ul>
 </div>
 
 <div class="info">
 <p class="center"><strong>100% Free - No Ads</strong></p>
-<p class="center">Optimized for Opera Mini 4.4</p>
+<p class="center">Works on Opera Mini 4.4</p>
 </div>
 
 {% if not has_cookies %}
 <div class="error">
 <p class="center"><strong>Notice:</strong></p>
-<p>YouTube may block downloads from cloud servers. If you see "sign in required" errors, <a href="/cookies" style="color: #a44a4a; text-decoration: underline;">upload cookies here</a>.</p>
+<p>YouTube may block downloads. If errors occur, <a href="/cookies" style="color: #a44a4a; text-decoration: underline;">upload cookies here</a>.</p>
 </div>
 {% else %}
 <div class="success">
-<p class="center">&#x2713; Cookies configured - ready to bypass YouTube restrictions</p>
+<p class="center">&#x2713; Cookies configured</p>
 </div>
 {% endif %}
 {% endblock %}
