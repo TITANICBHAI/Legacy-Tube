@@ -47,11 +47,11 @@ def parse_filesize(size_str):
             return int(float(size_str[:-1]) * multiplier)
     return int(size_str)
 
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))
-DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
-CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 2 * 3600))  # 2 hours for Render free tier
+DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 1800))  # 30 min max download
+CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 3600))  # 1 hour max conversion
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
-MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '2G'))
+MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '500M'))  # 500MB for Render free tier (2GB /tmp total)
 
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
