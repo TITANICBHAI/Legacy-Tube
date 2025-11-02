@@ -63,6 +63,7 @@ The application features ultra-lightweight HTML templates designed for feature p
 - `POST /convert`: Initiates video conversion.
 - `GET /status/<file_id>`: Displays conversion progress.
 - `GET /download/<file_id>`: Serves the converted 3GP file.
+- `GET /search` & `POST /search`: YouTube search interface (no API key required).
 - `GET /cookies` & `POST /cookies`: Interface for managing YouTube authentication cookies.
 - `GET /health`: Health check endpoint.
 
@@ -82,7 +83,14 @@ The application features ultra-lightweight HTML templates designed for feature p
 
 ## Recent Updates
 
-### November 2, 2025
+### November 2, 2025 (Latest)
+- ✅ **CRITICAL FIX**: Fixed search function URL construction bug that could return invalid YouTube URLs
+- ✅ **CRITICAL FIX**: Fixed cleanup function to properly delete both .3gp and .mp3 files (was only deleting .3gp)
+- ✅ Enhanced search function with comprehensive error handling (timeout, 429, 403, bot detection)
+- ✅ Added cookie support to search requests for better rate-limit handling and bot detection bypass
+- ✅ Added 30-second socket timeout to search for 2G network compatibility
+- ✅ Improved search result validation and empty result handling
+- ✅ Fixed quality preset options in search page to properly match backend presets
 - ✅ Added quality presets: 4 options for MP3 (128-320kbps), 4 options for 3GP video
 - ✅ Improved MP3 compression with VBR mode and better quality settings
 - ✅ Enhanced 3GP compression with rate distortion optimization for smaller files
