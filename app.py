@@ -1087,6 +1087,9 @@ def search():
                                 logger.warning(f"Could not determine URL for search result: {entry.get('title', 'Unknown')}")
                                 continue  # Skip this result
 
+                            # Get thumbnail URL (small thumbnail for 2G networks)
+                            thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/default.jpg"
+                            
                             results.append({
                                 'title': entry.get('title', 'Unknown'),
                                 'url': final_url,
@@ -1095,6 +1098,7 @@ def search():
                                 'upload_date': upload_date_str,
                                 'channel': entry.get('channel', entry.get('uploader', 'Unknown')),
                                 'views': view_str,
+                                'thumbnail': thumbnail_url,
                             })
 
             # Validate we got results
