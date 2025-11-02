@@ -1,10 +1,18 @@
-# Place your pre-compiled FFmpeg and FFprobe binaries here
+# Pre-placing FFmpeg Binaries for Render Deployment
 # 
-# For Render deployment, you can place static binaries here:
-# - bin/ffmpeg
-# - bin/ffprobe
+# To avoid downloading FFmpeg every time Render builds your app:
 #
-# Download static binaries from:
-# https://johnvansickle.com/ffmpeg/
+# 1. Download static binaries:
+#    https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
 #
-# The build.sh script will check this folder first before downloading.
+# 2. Extract and place in this folder:
+#    - bin/ffmpeg
+#    - bin/ffprobe
+#
+# 3. Make them executable:
+#    chmod +x bin/ffmpeg bin/ffprobe
+#
+# 4. Commit to your repository (ignored by .gitignore but folder tracked)
+#
+# The build.sh script checks this folder FIRST before downloading,
+# saving build time and avoiding download issues on Render.

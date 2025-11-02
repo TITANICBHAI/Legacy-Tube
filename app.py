@@ -913,11 +913,35 @@ def search():
                             duration = entry.get('duration', 0)
                             duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
                             
+                            # Format upload date
+                            upload_date = entry.get('upload_date', '')
+                            upload_date_str = "Unknown"
+                            if upload_date and len(upload_date) == 8:  # Format: YYYYMMDD
+                                try:
+                                    upload_date_str = f"{upload_date[6:8]}/{upload_date[4:6]}/{upload_date[0:4]}"
+                                except:
+                                    upload_date_str = "Unknown"
+                            
+                            # Format view count
+                            view_count = entry.get('view_count', 0)
+                            if view_count:
+                                if view_count >= 1000000:
+                                    view_str = f"{view_count/1000000:.1f}M views"
+                                elif view_count >= 1000:
+                                    view_str = f"{view_count/1000:.1f}K views"
+                                else:
+                                    view_str = f"{view_count} views"
+                            else:
+                                view_str = "Unknown views"
+                            
                             results.append({
                                 'title': entry.get('title', 'Unknown'),
                                 'url': entry.get('url', '') if entry.get('url', '').startswith('http') else f"https://www.youtube.com/watch?v={entry.get('id', '')}",
                                 'duration': duration_str,
                                 'duration_seconds': duration,
+                                'upload_date': upload_date_str,
+                                'channel': entry.get('channel', entry.get('uploader', 'Unknown')),
+                                'views': view_str,
                             })
             
             return render_template('search.html', results=results, query=query)
