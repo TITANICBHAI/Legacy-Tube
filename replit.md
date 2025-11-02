@@ -86,6 +86,8 @@ The application features ultra-lightweight HTML templates designed for feature p
 ### November 2, 2025 (Latest)
 - ✅ **CRITICAL FIX**: Fixed search function URL construction bug that could return invalid YouTube URLs
 - ✅ **CRITICAL FIX**: Fixed cleanup function to properly delete both .3gp and .mp3 files (was only deleting .3gp)
+- ✅ **NEW**: Auto-download FFmpeg if not found - no more deployment failures!
+- ✅ **NEW**: FFmpeg detection now logs actual paths to help discover Render's locations
 - ✅ Enhanced search function with comprehensive error handling (timeout, 429, 403, bot detection)
 - ✅ Added cookie support to search requests for better rate-limit handling and bot detection bypass
 - ✅ Added 30-second socket timeout to search for 2G network compatibility

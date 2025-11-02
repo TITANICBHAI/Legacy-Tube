@@ -124,33 +124,89 @@ VIDEO_QUALITY_PRESETS = {
 }
 
 # Detect FFmpeg path (for Render free tier compatibility)
+def download_ffmpeg_binary():
+    """Auto-download FFmpeg if not found - helps discover Render's actual paths"""
+    try:
+        logger.info("FFmpeg not found in expected locations. Attempting auto-download...")
+        
+        # Try downloading to /tmp first (always writable)
+        download_dir = '/tmp/bin'
+        os.makedirs(download_dir, exist_ok=True)
+        
+        ffmpeg_url = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'
+        download_path = os.path.join(download_dir, 'ffmpeg-static.tar.xz')
+        
+        logger.info(f"Downloading FFmpeg from {ffmpeg_url}...")
+        result = subprocess.run(['wget', '-O', download_path, ffmpeg_url], 
+                              capture_output=True, timeout=120)
+        
+        if result.returncode == 0 and os.path.exists(download_path):
+            logger.info(f"Download successful! Extracting to {download_dir}...")
+            subprocess.run(['tar', '-xJf', download_path, '-C', download_dir, '--strip-components=1'],
+                         timeout=60)
+            os.remove(download_path)
+            
+            ffmpeg_binary = os.path.join(download_dir, 'ffmpeg')
+            if os.path.exists(ffmpeg_binary):
+                os.chmod(ffmpeg_binary, 0o755)
+                logger.info(f"✓ FFmpeg auto-downloaded successfully to: {ffmpeg_binary}")
+                logger.info(f"✓ DISCOVERED PATH: {ffmpeg_binary} (use this in your config!)")
+                return ffmpeg_binary
+        
+        logger.warning("Auto-download failed, trying system package manager...")
+        # Try apt-get as last resort (works on some systems)
+        subprocess.run(['apt-get', 'update'], capture_output=True, timeout=30)
+        subprocess.run(['apt-get', 'install', '-y', 'ffmpeg'], capture_output=True, timeout=120)
+        
+        return 'ffmpeg'  # Hope it's now in PATH
+        
+    except Exception as e:
+        logger.error(f"Auto-download failed: {e}")
+        return 'ffmpeg'  # Fallback to system PATH
+
 def get_ffmpeg_path():
-    """Find FFmpeg binary - checks multiple locations for Render compatibility"""
+    """Find FFmpeg binary - checks multiple locations, auto-downloads if needed"""
     possible_paths = [
         'bin/ffmpeg',  # Pre-placed binary in repository
         '/opt/bin/ffmpeg',  # Static binary location (from build.sh)
+        '/tmp/bin/ffmpeg',  # Auto-downloaded location
         'ffmpeg',  # System PATH
         '/usr/bin/ffmpeg',  # Standard location
         '/usr/local/bin/ffmpeg',  # Alternative location
     ]
     
+    # First pass: try all known locations
     for path in possible_paths:
         try:
             result = subprocess.run([path, '-version'], capture_output=True, timeout=5)
             if result.returncode == 0:
-                logger.info(f"FFmpeg found at: {path}")
+                logger.info(f"✓ FFmpeg found at: {path}")
                 return path
         except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
             continue
     
-    logger.error("FFmpeg not found in any expected location!")
-    return 'ffmpeg'  # Fallback to system PATH
+    # Not found - try auto-download
+    logger.warning("FFmpeg not found in any expected location - attempting auto-download...")
+    downloaded_path = download_ffmpeg_binary()
+    
+    # Verify the downloaded binary works
+    try:
+        result = subprocess.run([downloaded_path, '-version'], capture_output=True, timeout=5)
+        if result.returncode == 0:
+            logger.info(f"✓ Auto-downloaded FFmpeg working at: {downloaded_path}")
+            return downloaded_path
+    except:
+        pass
+    
+    logger.error("⚠️ FFmpeg not available - conversions may fail!")
+    return 'ffmpeg'  # Last resort fallback
 
 def get_ffprobe_path():
-    """Find FFprobe binary - checks multiple locations for Render compatibility"""
+    """Find FFprobe binary - checks multiple locations, uses ffmpeg if needed"""
     possible_paths = [
         'bin/ffprobe',  # Pre-placed binary in repository
         '/opt/bin/ffprobe',  # Static binary location (from build.sh)
+        '/tmp/bin/ffprobe',  # Auto-downloaded location
         'ffprobe',  # System PATH
         '/usr/bin/ffprobe',  # Standard location
         '/usr/local/bin/ffprobe',  # Alternative location
@@ -160,12 +216,12 @@ def get_ffprobe_path():
         try:
             result = subprocess.run([path, '-version'], capture_output=True, timeout=5)
             if result.returncode == 0:
-                logger.info(f"FFprobe found at: {path}")
+                logger.info(f"✓ FFprobe found at: {path}")
                 return path
         except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
             continue
     
-    logger.warning("FFprobe not found, using ffmpeg for duration detection")
+    logger.info("FFprobe not found (not critical - FFmpeg can handle duration detection)")
     return 'ffprobe'  # Fallback to system PATH
 
 FFMPEG_PATH = get_ffmpeg_path()
