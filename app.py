@@ -481,22 +481,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
 
         # Download strategies - Updated for YouTube's new restrictions (Nov 2024)
-        # Multiple clients to bypass bot detection - trying most reliable first
+        # Multiple clients to bypass bot detection - ordered by reliability
         strategies = [
-            {
-                'name': 'Android TV Embedded (Best for Downloads)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['android_embedded'],
-                        'player_skip': ['configs', 'webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.29.37 (Linux; U; Android 13; en_US)',
-                        'X-YouTube-Client-Name': '3',
-                        'X-YouTube-Client-Version': '19.29.37'
-                    }
-                }
-            },
             {
                 'name': 'iOS Client (Most Reliable)',
                 'opts': {
@@ -508,6 +494,20 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
                         'X-YouTube-Client-Name': '5',
                         'X-YouTube-Client-Version': '19.29.1'
+                    }
+                }
+            },
+            {
+                'name': 'Android Client (Best Compatibility)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android'],
+                        'player_skip': ['configs', 'webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.android.youtube/19.29.37 (Linux; U; Android 13; en_US)',
+                        'X-YouTube-Client-Name': '3',
+                        'X-YouTube-Client-Version': '19.29.37'
                     }
                 }
             },
@@ -526,21 +526,21 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             },
             {
-                'name': 'Android Client (Fallback)',
+                'name': 'Android Creator (Alternative)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['android'],
+                        'player_client': ['android_creator'],
                         'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.29.37 (Linux; U; Android 13; en_US)',
-                        'X-YouTube-Client-Name': '3',
-                        'X-YouTube-Client-Version': '19.29.37'
+                        'User-Agent': 'com.google.android.apps.youtube.creator/24.06.103 (Linux; U; Android 13)',
+                        'X-YouTube-Client-Name': '14',
+                        'X-YouTube-Client-Version': '24.06.103'
                     }
                 }
             },
             {
-                'name': 'Mobile Web (Alternative)',
+                'name': 'Mobile Web (Fallback)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['mweb'],
@@ -554,14 +554,14 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             },
             {
-                'name': 'TV Embedded (Low Detection)',
+                'name': 'TV Embedded (Last Resort)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['tv_embedded'],
                         'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (CrKey) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (PlayStation; PlayStation 5/7.00) AppleWebKit/605.1.15 Chrome/126.0.0.0 Safari/605.1.15'
                     }
                 }
             }
@@ -1027,124 +1027,128 @@ def search():
     # Check if showing thumbnails (default: no, to save data on 2G)
     show_thumbnails = request.args.get('show_thumbnails', '0') == '1'
     
+    # Get query from POST (new search) or GET (thumbnail toggle)
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
-
-        if not query:
+    else:
+        query = request.args.get('query', '').strip()
+    
+    # If no query, show the search form
+    if not query:
+        if request.method == 'POST':
             flash('Please enter a search term')
-            return redirect(url_for('search'))
+        return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails)
+    
+    # Execute the search (query is guaranteed to exist here)
+    try:
+        # Use yt-dlp to search YouTube (no API key required)
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'force_generic_extractor': False,
+            'socket_timeout': 30,  # Timeout for 2G networks
+        }
+
+        # Add cookies if available (helps with rate limiting and bot detection)
+        if has_cookies():
+            ydl_opts['cookiefile'] = COOKIES_FILE
+
+        results = []
+        search_results = None
 
         try:
-            # Use yt-dlp to search YouTube (no API key required)
-            ydl_opts = {
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': True,
-                'force_generic_extractor': False,
-                'socket_timeout': 30,  # Timeout for 2G networks
-            }
-
-            # Add cookies if available (helps with rate limiting and bot detection)
-            if has_cookies():
-                ydl_opts['cookiefile'] = COOKIES_FILE
-
-            results = []
-            search_results = None
-
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # Search for up to 10 results with timeout protection
-                    search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
-            except yt_dlp.utils.DownloadError as e:
-                error_msg = str(e)
-                logger.error(f"Search DownloadError: {error_msg}")
-                if 'timeout' in error_msg.lower():
-                    flash('Search timed out. Please check your connection and try again.')
-                elif '429' in error_msg or 'too many requests' in error_msg.lower():
-                    flash('Too many search requests. Please wait a few minutes and try again.')
-                elif '403' in error_msg or 'forbidden' in error_msg.lower():
-                    flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
-                else:
-                    flash('YouTube search error. Please try again.')
-                return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
-            except Exception as e:
-                logger.error(f"Search extraction error: {str(e)}")
-                flash('Search failed. Please try again later.')
-                return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
-
-            # Process search results
-            if search_results and 'entries' in search_results:
-                for entry in search_results['entries']:
-                        if entry and entry.get('id'):  # Ensure entry has an ID
-                            duration = entry.get('duration', 0)
-                            duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
-
-                            # Format upload date
-                            upload_date = entry.get('upload_date', '')
-                            upload_date_str = "Unknown"
-                            if upload_date and len(upload_date) == 8:  # Format: YYYYMMDD
-                                try:
-                                    upload_date_str = f"{upload_date[6:8]}/{upload_date[4:6]}/{upload_date[0:4]}"
-                                except:
-                                    upload_date_str = "Unknown"
-
-                            # Format view count
-                            view_count = entry.get('view_count', 0)
-                            if view_count:
-                                if view_count >= 1000000:
-                                    view_str = f"{view_count/1000000:.1f}M views"
-                                elif view_count >= 1000:
-                                    view_str = f"{view_count/1000:.1f}K views"
-                                else:
-                                    view_str = f"{view_count} views"
-                            else:
-                                view_str = "Unknown views"
-
-                            # FIXED: Proper URL construction for YouTube videos
-                            # yt-dlp flat extraction may return partial URLs or video IDs
-                            video_id = entry.get('id', '')
-                            video_url = entry.get('url', '')
-
-                            # Construct proper YouTube URL
-                            if video_url and video_url.startswith('http'):
-                                # Already a full URL
-                                final_url = video_url
-                            elif video_id:
-                                # Construct from video ID
-                                final_url = f"https://www.youtube.com/watch?v={video_id}"
-                            else:
-                                # Fallback: try to extract from URL field
-                                logger.warning(f"Could not determine URL for search result: {entry.get('title', 'Unknown')}")
-                                continue  # Skip this result
-
-                            # Get thumbnail URL (small thumbnail for 2G networks)
-                            thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/default.jpg"
-                            
-                            results.append({
-                                'title': entry.get('title', 'Unknown'),
-                                'url': final_url,
-                                'duration': duration_str,
-                                'duration_seconds': duration,
-                                'upload_date': upload_date_str,
-                                'channel': entry.get('channel', entry.get('uploader', 'Unknown')),
-                                'views': view_str,
-                                'thumbnail': thumbnail_url,
-                            })
-
-            # Validate we got results
-            if not results:
-                flash('No results found. Try different search terms.')
-                return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails)
-
-            return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails)
-
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                # Search for up to 10 results with timeout protection
+                search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
+        except yt_dlp.utils.DownloadError as e:
+            error_msg = str(e)
+            logger.error(f"Search DownloadError: {error_msg}")
+            if 'timeout' in error_msg.lower():
+                flash('Search timed out. Please check your connection and try again.')
+            elif '429' in error_msg or 'too many requests' in error_msg.lower():
+                flash('Too many search requests. Please wait a few minutes and try again.')
+            elif '403' in error_msg or 'forbidden' in error_msg.lower():
+                flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
+            else:
+                flash('YouTube search error. Please try again.')
+            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
         except Exception as e:
-            # Catch any unexpected errors not handled by inner try-except
-            logger.error(f"Unexpected search error: {str(e)}")
-            flash('An unexpected error occurred. Please try again.')
-            return render_template('search.html', results=None, query=query)
+            logger.error(f"Search extraction error: {str(e)}")
+            flash('Search failed. Please try again later.')
+            return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
 
-    return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails)
+        # Process search results
+        if search_results and 'entries' in search_results:
+            for entry in search_results['entries']:
+                if entry and entry.get('id'):  # Ensure entry has an ID
+                    duration = entry.get('duration', 0)
+                    duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
+
+                    # Format upload date
+                    upload_date = entry.get('upload_date', '')
+                    upload_date_str = "Unknown"
+                    if upload_date and len(upload_date) == 8:  # Format: YYYYMMDD
+                        try:
+                            upload_date_str = f"{upload_date[6:8]}/{upload_date[4:6]}/{upload_date[0:4]}"
+                        except:
+                            upload_date_str = "Unknown"
+
+                    # Format view count
+                    view_count = entry.get('view_count', 0)
+                    if view_count:
+                        if view_count >= 1000000:
+                            view_str = f"{view_count/1000000:.1f}M views"
+                        elif view_count >= 1000:
+                            view_str = f"{view_count/1000:.1f}K views"
+                        else:
+                            view_str = f"{view_count} views"
+                    else:
+                        view_str = "Unknown views"
+
+                    # FIXED: Proper URL construction for YouTube videos
+                    # yt-dlp flat extraction may return partial URLs or video IDs
+                    video_id = entry.get('id', '')
+                    video_url = entry.get('url', '')
+
+                    # Construct proper YouTube URL
+                    if video_url and video_url.startswith('http'):
+                        # Already a full URL
+                        final_url = video_url
+                    elif video_id:
+                        # Construct from video ID
+                        final_url = f"https://www.youtube.com/watch?v={video_id}"
+                    else:
+                        # Fallback: try to extract from URL field
+                        logger.warning(f"Could not determine URL for search result: {entry.get('title', 'Unknown')}")
+                        continue  # Skip this result
+
+                    # Get thumbnail URL (small thumbnail for 2G networks)
+                    thumbnail_url = f"https://i.ytimg.com/vi/{video_id}/default.jpg"
+                    
+                    results.append({
+                        'title': entry.get('title', 'Unknown'),
+                        'url': final_url,
+                        'duration': duration_str,
+                        'duration_seconds': duration,
+                        'upload_date': upload_date_str,
+                        'channel': entry.get('channel', entry.get('uploader', 'Unknown')),
+                        'views': view_str,
+                        'thumbnail': thumbnail_url,
+                    })
+
+        # Validate we got results
+        if not results:
+            flash('No results found. Try different search terms.')
+            return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails)
+
+        return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails)
+
+    except Exception as e:
+        # Catch any unexpected errors not handled by inner try-except
+        logger.error(f"Unexpected search error: {str(e)}")
+        flash('An unexpected error occurred. Please try again.')
+        return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
 
 @app.route('/cookies', methods=['GET', 'POST'])
 def cookies_page():
