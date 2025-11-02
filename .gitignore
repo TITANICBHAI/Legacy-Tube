@@ -58,3 +58,8 @@ Thumbs.db
 
 # Attached assets
 attached_assets/
+
+# FFmpeg binaries (keep folder, ignore binaries)
+bin/ffmpeg
+bin/ffprobe
+!bin/.gitkeep

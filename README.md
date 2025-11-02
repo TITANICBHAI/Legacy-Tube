@@ -9,6 +9,8 @@ Convert YouTube videos to 3GP format optimized for feature phones like Nokia 531
 ## ✨ Features
 
 ### Core Features
+- **Quality Options** - Choose from 4 MP3 qualities (128k-320k) and 4 video qualities
+- **Smart Compression** - Advanced FFmpeg settings for better quality at smaller sizes
 - **Works Without Cookies** - 4 automatic fallback strategies for YouTube downloads
 - **No JavaScript** - Works on Opera Mini 4.4 and older browsers
 - **Ultra-Low Bitrate** - Optimized for 2G networks (176x144 resolution)
@@ -27,13 +29,28 @@ Convert YouTube videos to 3GP format optimized for feature phones like Nokia 531
 
 ## 📊 Technical Details
 
+### 3GP Video Quality Options
 - **Resolution**: 176x144 (perfect for feature phone screens)
-- **Format**: 3GP
-- **Video Codec**: MPEG-4 (200kbps)
-- **Audio Codec**: AAC (12.2kbps, 8000 Hz)
-- **Max Duration**: 6 hours
+- **Format**: 3GP with MPEG-4 video codec and AAC audio
+- **Audio**: 24kbps AAC, 16kHz (same across all presets for compatibility)
+- **Quality Presets** (video bitrate/fps only):
+  - **Ultra Low**: 150kbps video, 10 fps (~1 MB per 5 min) - 2G networks
+  - **Low** (Default): 200kbps video, 12 fps (~2 MB per 5 min) - Recommended for feature phones
+  - **Medium**: 300kbps video, 15 fps (~2.5 MB per 5 min) - Better quality
+  - **High**: 400kbps video, 20 fps (~3 MB per 5 min) - Best quality
+
+### MP3 Audio Quality Options
+- **Format**: MP3 with optimized VBR compression
+- **Quality Presets** (minimum 128kbps for reliability):
+  - **128 kbps** (Default): Good quality, stereo (~5 MB per 5 min)
+  - **192 kbps**: High quality, stereo (~7 MB per 5 min)
+  - **256 kbps**: Very high quality, stereo (~9 MB per 5 min)
+  - **320 kbps**: Maximum quality, stereo (~12 MB per 5 min)
+
+### General Settings
+- **Max Duration**: 6 hours (configurable)
 - **Max File Size**: 500 MB
-- **File Size**: ~2-3 MB per 5 minutes
+- **Auto Quality**: 128kbps for MP3, Low for 3GP
 
 ## 🚀 Deployment Options
 
@@ -109,9 +126,13 @@ See **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** for complete navigation
 ```
 .
 ├── app.py                      # Main Flask application
+├── bin/                        # Optional: Place pre-compiled FFmpeg binaries here
+│   ├── .gitkeep               # Keeps bin folder in repo
+│   ├── ffmpeg                 # (Optional) Static FFmpeg binary
+│   └── ffprobe                # (Optional) Static FFprobe binary
 ├── templates/                  # HTML templates (feature phone optimized)
 │   ├── base.html              # Base template with minimal CSS
-│   ├── index.html             # Homepage with URL input
+│   ├── index.html             # Homepage with URL input and quality selection
 │   ├── status.html            # Conversion progress page
 │   └── cookies.html           # Cookie management page
 ├── requirements.txt           # Python dependencies
@@ -120,7 +141,7 @@ See **[DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)** for complete navigation
 ├── .dockerignore             # Docker build optimization
 ├── .env.example              # Environment variables template
 ├── render.yaml               # Render deployment config
-├── build.sh                  # Build script for Render
+├── build.sh                  # Build script for Render (checks bin/ first)
 └── Documentation/
     ├── RENDER_MANUAL_SETUP.md    # Step-by-step Render guide (START HERE!)
     ├── RENDER_DEPLOYMENT.md      # Render optimization guide

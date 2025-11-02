@@ -8,18 +8,33 @@ pip install --no-cache-dir -r requirements.txt
 echo "Installing system dependencies..."
 FFMPEG_INSTALLED=false
 
-# Try system package managers first
-if command -v apt-get &> /dev/null; then
-    echo "Trying apt-get installation..."
-    apt-get update -qq && apt-get install -y -qq ffmpeg && FFMPEG_INSTALLED=true || echo "apt-get failed, will try static binary"
-elif command -v apk &> /dev/null; then
-    echo "Trying apk installation..."
-    apk add --no-cache ffmpeg && FFMPEG_INSTALLED=true || echo "apk failed, will try static binary"
+# FIRST: Check for pre-placed binaries in bin/ folder (for Render deployments)
+if [ -f "bin/ffmpeg" ] && [ -x "bin/ffmpeg" ]; then
+    echo "Found pre-placed FFmpeg binaries in bin/ folder!"
+    mkdir -p /opt/bin
+    cp bin/ffmpeg /opt/bin/ffmpeg
+    [ -f "bin/ffprobe" ] && cp bin/ffprobe /opt/bin/ffprobe
+    chmod +x /opt/bin/ffmpeg
+    [ -f /opt/bin/ffprobe ] && chmod +x /opt/bin/ffprobe
+    export PATH="/opt/bin:$PATH"
+    FFMPEG_INSTALLED=true
+    echo "Using pre-placed binaries from repository"
 fi
 
-# Fallback: Download static FFmpeg binary for Render free tier
+# SECOND: Try system package managers
 if [ "$FFMPEG_INSTALLED" = false ]; then
-    echo "Downloading static FFmpeg binary..."
+    if command -v apt-get &> /dev/null; then
+        echo "Trying apt-get installation..."
+        apt-get update -qq && apt-get install -y -qq ffmpeg && FFMPEG_INSTALLED=true || echo "apt-get failed, will try static binary"
+    elif command -v apk &> /dev/null; then
+        echo "Trying apk installation..."
+        apk add --no-cache ffmpeg && FFMPEG_INSTALLED=true || echo "apk failed, will try static binary"
+    fi
+fi
+
+# THIRD: Fallback - Download static FFmpeg binary
+if [ "$FFMPEG_INSTALLED" = false ]; then
+    echo "Downloading static FFmpeg binary from johnvansickle.com..."
     mkdir -p /opt/bin
     
     # Download FFmpeg static build (latest version)

@@ -20,6 +20,22 @@
 <label for="fmt_mp3">MP3 Audio Only</label>
 </p>
 
+<p><strong>Select Quality:</strong></p>
+<select name="quality" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+<option value="auto">Auto (Recommended)</option>
+<optgroup label="3GP Video Quality">
+{% for key, preset in video_presets.items() %}
+<option value="{{ key }}">{{ preset.name }} - {{ preset.description }}</option>
+{% endfor %}
+</optgroup>
+<optgroup label="MP3 Audio Quality">
+{% for key, preset in mp3_presets.items() %}
+<option value="{{ key }}">{{ preset.name }} - {{ preset.description }}</option>
+{% endfor %}
+</optgroup>
+</select>
+<p style="font-size: 12px; color: #666; margin-top: -5px;">Auto: 128kbps for MP3, Low quality for 3GP</p>
+
 <button type="submit">Start Conversion</button>
 </form>
 
@@ -44,20 +60,24 @@
 
 <div class="info">
 <h2>Format Details:</h2>
-<p><strong>3GP Video:</strong></p>
+<p><strong>3GP Video Quality Options:</strong></p>
 <ul>
-<li>Resolution: 176x144</li>
-<li>Size: ~1-2 MB per 5 min</li>
-<li>Better quality, smaller size</li>
+<li>Ultra Low: ~1 MB per 5 min (2G networks)</li>
+<li>Low: ~2 MB per 5 min (recommended)</li>
+<li>Medium: ~2.5 MB per 5 min (better quality)</li>
+<li>High: ~3 MB per 5 min (best quality)</li>
 </ul>
-<p><strong>MP3 Audio:</strong></p>
+<p style="font-size: 12px; color: #666;">All 3GP videos: 24kbps audio, 16kHz</p>
+<p><strong>MP3 Audio Quality Options:</strong></p>
 <ul>
-<li>Audio only: 48kbps</li>
-<li>Size: ~2 MB per 5 min</li>
-<li>Great for music/podcasts</li>
+<li>128 kbps: ~5 MB per 5 min (good)</li>
+<li>192 kbps: ~7 MB per 5 min (high)</li>
+<li>256 kbps: ~9 MB per 5 min (very high)</li>
+<li>320 kbps: ~12 MB per 5 min (maximum)</li>
 </ul>
-<p><strong>Both formats:</strong></p>
+<p><strong>All formats:</strong></p>
 <ul>
+<li>Resolution: 176x144 (3GP only)</li>
 <li>Max length: {{ max_hours|int }} hours</li>
 <li>Files auto-delete after 6 hours</li>
 </ul>

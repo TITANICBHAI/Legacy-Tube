@@ -1,0 +1,10 @@
+# Place your pre-compiled FFmpeg and FFprobe binaries here
+# 
+# For Render deployment, you can place static binaries here:
+# - bin/ffmpeg
+# - bin/ffprobe
+#
+# Download static binaries from:
+# https://johnvansickle.com/ffmpeg/
+#
+# The build.sh script will check this folder first before downloading.

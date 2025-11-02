@@ -53,12 +53,83 @@ MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))
 ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 'true').lower() == 'true'
 DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 1500))  # Alert when < 1.5GB free
 
+# Quality presets for MP3 audio conversion
+# Note: Minimum 128kbps to avoid YouTube download errors with low bitrate
+MP3_QUALITY_PRESETS = {
+    'medium': {
+        'name': '128 kbps (Good Quality - Recommended)',
+        'bitrate': '128k',
+        'sample_rate': '44100',
+        'vbr_quality': '4',
+        'description': '~5 MB per 5 min'
+    },
+    'high': {
+        'name': '192 kbps (High Quality)',
+        'bitrate': '192k',
+        'sample_rate': '44100',
+        'vbr_quality': '2',
+        'description': '~7 MB per 5 min'
+    },
+    'veryhigh': {
+        'name': '256 kbps (Very High Quality)',
+        'bitrate': '256k',
+        'sample_rate': '48000',
+        'vbr_quality': '0',
+        'description': '~9 MB per 5 min'
+    },
+    'extreme': {
+        'name': '320 kbps (Maximum Quality)',
+        'bitrate': '320k',
+        'sample_rate': '48000',
+        'vbr_quality': '0',
+        'description': '~12 MB per 5 min'
+    }
+}
+
+# Quality presets for 3GP video conversion
+# Note: Audio settings kept constant (24k/16kHz) for feature phone compatibility
+VIDEO_QUALITY_PRESETS = {
+    'ultralow': {
+        'name': 'Ultra Low (2G Networks)',
+        'video_bitrate': '150k',
+        'audio_bitrate': '24k',  # Constant across all presets
+        'audio_sample_rate': '16000',  # Constant across all presets
+        'fps': '10',
+        'description': '~1 MB per 5 min'
+    },
+    'low': {
+        'name': 'Low (Recommended for Feature Phones)',
+        'video_bitrate': '200k',
+        'audio_bitrate': '24k',  # Constant across all presets
+        'audio_sample_rate': '16000',  # Constant across all presets
+        'fps': '12',
+        'description': '~2 MB per 5 min'
+    },
+    'medium': {
+        'name': 'Medium (Better Quality)',
+        'video_bitrate': '300k',
+        'audio_bitrate': '24k',  # Constant across all presets
+        'audio_sample_rate': '16000',  # Constant across all presets
+        'fps': '15',
+        'description': '~2.5 MB per 5 min'
+    },
+    'high': {
+        'name': 'High (Best Quality)',
+        'video_bitrate': '400k',
+        'audio_bitrate': '24k',  # Constant across all presets
+        'audio_sample_rate': '16000',  # Constant across all presets
+        'fps': '20',
+        'description': '~3 MB per 5 min'
+    }
+}
+
 # Detect FFmpeg path (for Render free tier compatibility)
 def get_ffmpeg_path():
     """Find FFmpeg binary - checks multiple locations for Render compatibility"""
     possible_paths = [
+        'bin/ffmpeg',  # Pre-placed binary in repository
+        '/opt/bin/ffmpeg',  # Static binary location (from build.sh)
         'ffmpeg',  # System PATH
-        '/opt/bin/ffmpeg',  # Static binary location
         '/usr/bin/ffmpeg',  # Standard location
         '/usr/local/bin/ffmpeg',  # Alternative location
     ]
@@ -78,8 +149,9 @@ def get_ffmpeg_path():
 def get_ffprobe_path():
     """Find FFprobe binary - checks multiple locations for Render compatibility"""
     possible_paths = [
+        'bin/ffprobe',  # Pre-placed binary in repository
+        '/opt/bin/ffprobe',  # Static binary location (from build.sh)
         'ffprobe',  # System PATH
-        '/opt/bin/ffprobe',  # Static binary location
         '/usr/bin/ffprobe',  # Standard location
         '/usr/local/bin/ffprobe',  # Alternative location
     ]
@@ -248,7 +320,7 @@ def validate_cookies():
     except Exception as e:
         return False, f"Error reading cookies: {str(e)}"
 
-def download_and_convert(url, file_id, output_format='3gp'):
+def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
     # Check disk space BEFORE starting download
     if ENABLE_DISK_SPACE_MONITORING:
         has_space, free_mb = check_disk_space()
@@ -266,9 +338,26 @@ def download_and_convert(url, file_id, output_format='3gp'):
     file_extension = 'mp3' if output_format == 'mp3' else '3gp'
     format_name = 'MP3 audio' if output_format == 'mp3' else '3GP video'
     
+    # Auto-select quality if not specified
+    if quality == 'auto':
+        if output_format == 'mp3':
+            quality = 'medium'  # 128kbps default for MP3
+        else:
+            quality = 'low'  # Low quality default for 3GP (feature phone optimized)
+    
+    # Validate quality preset
+    if output_format == 'mp3':
+        if quality not in MP3_QUALITY_PRESETS:
+            quality = 'medium'
+        quality_preset = MP3_QUALITY_PRESETS[quality]
+    else:
+        if quality not in VIDEO_QUALITY_PRESETS:
+            quality = 'low'
+        quality_preset = VIDEO_QUALITY_PRESETS[quality]
+    
     update_status(file_id, {
         'status': 'downloading',
-        'progress': f'Downloading from YouTube for {format_name} conversion... (this may take several minutes for long videos)',
+        'progress': f'Downloading from YouTube for {format_name} conversion ({quality_preset["name"]})... (this may take several minutes for long videos)',
         'url': url,
         'timestamp': datetime.now().isoformat()
     })
@@ -488,19 +577,20 @@ def download_and_convert(url, file_id, output_format='3gp'):
         if output_format == 'mp3':
             update_status(file_id, {
                 'status': 'converting',
-                'progress': f'Converting to MP3 audio... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
+                'progress': f'Converting to MP3 audio ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
             })
             
-            # Optimized MP3 conversion for feature phones
+            # MP3 conversion with quality preset
             convert_cmd = [
                 FFMPEG_PATH,
                 '-i', temp_video,
                 '-vn',  # No video
                 '-acodec', 'libmp3lame',
-                '-ar', '22050',  # Sample rate optimized for voice/music balance
-                '-b:a', '48k',  # Bitrate for good quality at small size
-                '-ac', '1',  # Mono
-                '-q:a', '4',  # Quality setting (VBR mode)
+                '-ar', quality_preset['sample_rate'],  # Sample rate from preset
+                '-b:a', quality_preset['bitrate'],  # Bitrate from preset
+                '-ac', '2' if quality in ['veryhigh', 'extreme'] else '1',  # Stereo for high quality, mono otherwise
+                '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
+                '-compression_level', '2',  # Faster encoding for web server
                 '-threads', '1',
                 '-y',
                 output_path
@@ -508,22 +598,29 @@ def download_and_convert(url, file_id, output_format='3gp'):
         else:
             update_status(file_id, {
                 'status': 'converting',
-                'progress': f'Converting to 3GP video... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
+                'progress': f'Converting to 3GP video ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
             })
             
-            # Optimized 3GP conversion - better quality, smaller size
+            # 3GP video conversion with quality preset and compression
+            video_bitrate_num = int(quality_preset['video_bitrate'].replace('k', ''))
+            maxrate = f"{int(video_bitrate_num * 1.25)}k"  # 25% higher maxrate for better quality
+            bufsize = f"{int(video_bitrate_num * 2)}k"  # Buffer size for smooth streaming
+            
             convert_cmd = [
                 FFMPEG_PATH,
                 '-i', temp_video,
                 '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
                 '-vcodec', 'mpeg4',
-                '-r', '12',
-                '-b:v', '200k',  # Reduced from 300k for smaller files
-                '-maxrate', '250k',  # Maximum bitrate cap
-                '-bufsize', '500k',  # Buffer size for rate control
+                '-r', quality_preset['fps'],  # FPS from preset
+                '-b:v', quality_preset['video_bitrate'],  # Video bitrate from preset
+                '-maxrate', maxrate,  # Dynamic maxrate based on bitrate
+                '-bufsize', bufsize,  # Dynamic buffer size
+                '-qmin', '2',  # Minimum quantizer for better quality
+                '-qmax', '31',  # Maximum quantizer
+                '-mbd', 'rd',  # Rate distortion optimization for better compression
                 '-acodec', 'aac',
-                '-ar', '16000',  # Reduced from 22050 for smaller files
-                '-b:a', '24k',  # Reduced from 48k for smaller files
+                '-ar', quality_preset['audio_sample_rate'],  # Audio sample rate from preset
+                '-b:a', quality_preset['audio_bitrate'],  # Audio bitrate from preset
                 '-ac', '1',
                 '-threads', '1',
                 '-y',
@@ -728,7 +825,11 @@ signal.signal(signal.SIGINT, signal_handler)
 def index():
     max_hours = MAX_VIDEO_DURATION / 3600
     cookies_status = has_cookies()
-    return render_template('index.html', max_hours=max_hours, has_cookies=cookies_status)
+    return render_template('index.html', 
+                         max_hours=max_hours, 
+                         has_cookies=cookies_status,
+                         mp3_presets=MP3_QUALITY_PRESETS,
+                         video_presets=VIDEO_QUALITY_PRESETS)
 
 @app.route('/favicon.ico')
 def favicon():
@@ -742,6 +843,7 @@ def health():
 def convert():
     url = request.form.get('url', '').strip()
     output_format = request.form.get('format', '3gp').strip()
+    quality = request.form.get('quality', 'auto').strip()
     
     if not url:
         flash('Please enter a YouTube URL')
@@ -756,7 +858,7 @@ def convert():
     
     file_id = generate_file_id(url)
     
-    thread = threading.Thread(target=download_and_convert, args=(url, file_id, output_format))
+    thread = threading.Thread(target=download_and_convert, args=(url, file_id, output_format, quality))
     thread.daemon = True
     thread.start()
     

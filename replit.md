@@ -23,13 +23,20 @@ This project is a web application designed to convert YouTube videos into the 3G
 The application features ultra-lightweight HTML templates designed for feature phone compatibility. It is built with no JavaScript to ensure functionality on Opera Mini 4.4 and other older browsers, relying on manual page refreshes for status updates and meta refresh tags where necessary. The UI provides clear status updates and time estimates for conversions.
 
 ### Feature Specifications
-- **Video Conversion**:
+- **Video Conversion** (3GP Format):
     - **Resolution**: 176x144 (with aspect ratio padding)
-    - **Format**: 3GP
-    - **Video Codec**: MPEG-4 (200kbps bitrate, 12 fps)
-    - **Audio Codec**: AAC (12.2kbps bitrate, 8000 Hz sample rate)
+    - **Format**: 3GP with MPEG-4 video and AAC audio
+    - **Quality Presets**: Ultra Low (150k video, 10fps), Low (200k video, 12fps), Medium (300k video, 15fps), High (400k video, 20fps)
+    - **Video Settings**: Variable bitrate with rate distortion optimization for better compression
+    - **Audio Settings**: Fixed at 24kbps AAC, 16kHz, mono (constant across all presets for feature phone compatibility)
     - **Max Duration**: 6 hours (configurable)
     - **Max File Size**: 500MB (configurable)
+- **Audio Conversion** (MP3 Format):
+    - **Quality Presets**: 128kbps (default), 192kbps, 256kbps, 320kbps
+    - **Compression**: VBR mode with optimized quality settings
+    - **Sample Rate**: 44.1-48kHz based on quality
+    - **Channels**: Mono for 128k/192k, stereo for 256k/320k
+    - **Note**: Minimum 128kbps to avoid YouTube download errors
 - **YouTube Authentication**: Supports cookie-based authentication to bypass YouTube's bot detection and rate limiting, allowing access to most public videos without requiring a logged-in YouTube account.
 - **Background Processing**: Video download and conversion occur asynchronously using Python threading, with status updates available on a dedicated page.
 - **File Management**: Automatic cleanup system deletes converted files after 6 hours and manages orphaned/failed jobs.
@@ -73,7 +80,17 @@ The application features ultra-lightweight HTML templates designed for feature p
 - **ADVANCED_TINKERING.md**: Advanced customization guide for developers who want to modify settings, optimize performance, or add new features
 - **DOCKER_DEPLOYMENT.md**: Docker deployment instructions and optimizations
 
-## Recent Updates (October 27, 2025)
+## Recent Updates
+
+### November 2, 2025
+- ✅ Added quality presets: 4 options for MP3 (128-320kbps), 4 options for 3GP video
+- ✅ Improved MP3 compression with VBR mode and better quality settings
+- ✅ Enhanced 3GP compression with rate distortion optimization for smaller files
+- ✅ Added bin/ folder support for pre-placed FFmpeg binaries (Render deployment)
+- ✅ Updated build.sh to check bin/ folder first before downloading binaries
+- ✅ User can now choose quality or use auto-select (128kbps MP3, Low 3GP)
+
+### October 27, 2025
 - ✅ Added YouTube IP block bypass with IPv6, proxy, and rate limiting support
 - ✅ Implemented advanced disk space monitoring for Render's 2GB /tmp limit
 - ✅ Enhanced error detection for IP blocks (403) and rate limiting (429)
