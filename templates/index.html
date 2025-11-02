@@ -20,21 +20,22 @@
 <label for="fmt_mp3">MP3 Audio Only</label>
 </p>
 
-<p><strong>Select Quality:</strong></p>
-<select name="quality" style="width: 100%; padding: 8px; margin-bottom: 10px;">
-<option value="auto">Auto (Recommended)</option>
-<optgroup label="3GP Video Quality">
+<p><strong>3GP Video Quality:</strong></p>
+<select name="video_quality" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+<option value="auto">Auto (Recommended - Low Quality)</option>
 {% for key, preset in video_presets.items() %}
 <option value="{{ key }}">{{ preset.name }} - {{ preset.description }}</option>
 {% endfor %}
-</optgroup>
-<optgroup label="MP3 Audio Quality">
+</select>
+
+<p><strong>MP3 Audio Quality:</strong></p>
+<select name="mp3_quality" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+<option value="auto">Auto (Recommended - 128kbps)</option>
 {% for key, preset in mp3_presets.items() %}
 <option value="{{ key }}">{{ preset.name }} - {{ preset.description }}</option>
 {% endfor %}
-</optgroup>
 </select>
-<p style="font-size: 12px; color: #666; margin-top: -5px;">Auto: 128kbps for MP3, Low quality for 3GP</p>
+<p style="font-size: 12px; color: #666; margin-top: -5px;">Choose quality based on your selected format above</p>
 
 <button type="submit">Start Conversion</button>
 </form>

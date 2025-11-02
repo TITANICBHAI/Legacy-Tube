@@ -932,7 +932,12 @@ def health():
 def convert():
     url = request.form.get('url', '').strip()
     output_format = request.form.get('format', '3gp').strip()
-    quality = request.form.get('quality', 'auto').strip()
+    
+    # Get quality based on selected format
+    if output_format == 'mp3':
+        quality = request.form.get('mp3_quality', 'auto').strip()
+    else:
+        quality = request.form.get('video_quality', 'auto').strip()
 
     if not url:
         flash('Please enter a YouTube URL')
