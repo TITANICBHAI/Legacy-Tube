@@ -102,11 +102,11 @@ MP3_QUALITY_PRESETS = {
 VIDEO_QUALITY_PRESETS = {
     'ultralow': {
         'name': 'Ultra Low (2G Networks)',
-        'video_bitrate': '150k',
+        'video_bitrate': '128k',
         'audio_bitrate': '24k',  # Constant across all presets
         'audio_sample_rate': '16000',  # Constant across all presets
         'fps': '10',
-        'description': '~1 MB per 5 min'
+        'description': '~0.8 MB per 5 min'
     },
     'low': {
         'name': 'Low (Recommended for Feature Phones)',
@@ -118,19 +118,19 @@ VIDEO_QUALITY_PRESETS = {
     },
     'medium': {
         'name': 'Medium (Better Quality)',
-        'video_bitrate': '300k',
+        'video_bitrate': '256k',
         'audio_bitrate': '24k',  # Constant across all presets
         'audio_sample_rate': '16000',  # Constant across all presets
         'fps': '15',
-        'description': '~2.5 MB per 5 min'
+        'description': '~2.3 MB per 5 min'
     },
     'high': {
         'name': 'High (Best Quality)',
-        'video_bitrate': '400k',
+        'video_bitrate': '320k',
         'audio_bitrate': '24k',  # Constant across all presets
         'audio_sample_rate': '16000',  # Constant across all presets
-        'fps': '20',
-        'description': '~3 MB per 5 min'
+        'fps': '15',
+        'description': '~2.8 MB per 5 min'
     }
 }
 
