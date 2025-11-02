@@ -39,20 +39,22 @@
     <label for="v{{ loop.index }}_mp3">MP3</label>
     </p>
     
-    <select name="quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
-    <option value="auto">Auto (128k MP3 / Low 3GP)</option>
-    <optgroup label="3GP Video">
+    <p style="font-size: 12px; margin: 5px 0;"><strong>3GP Quality:</strong></p>
+    <select name="video_quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
+    <option value="auto">Auto (Low)</option>
     <option value="ultralow">Ultra Low (~1MB/5min)</option>
     <option value="low">Low (~2MB/5min)</option>
     <option value="medium">Medium (~2.5MB/5min)</option>
     <option value="high">High (~3MB/5min)</option>
-    </optgroup>
-    <optgroup label="MP3 Audio">
+    </select>
+    
+    <p style="font-size: 12px; margin: 5px 0;"><strong>MP3 Quality:</strong></p>
+    <select name="mp3_quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
+    <option value="auto">Auto (128kbps)</option>
     <option value="medium">128kbps (~5MB/5min)</option>
     <option value="high">192kbps (~7MB/5min)</option>
     <option value="veryhigh">256kbps (~9MB/5min)</option>
     <option value="extreme">320kbps (~12MB/5min)</option>
-    </optgroup>
     </select>
     
     <button type="submit">Convert This</button>
