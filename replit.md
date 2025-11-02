@@ -22,11 +22,18 @@ This project is a web application designed to convert YouTube videos into the 3G
 ### UI/UX Decisions
 The application features ultra-lightweight HTML templates designed for feature phone compatibility. It is built with no JavaScript to ensure functionality on Opera Mini 4.4 and other older browsers, relying on manual page refreshes for status updates and meta refresh tags where necessary. The UI provides clear status updates and time estimates for conversions.
 
+**Recent UI Improvements (Nov 2025):**
+- Enhanced status pages with emoji indicators for better visual clarity on feature phones
+- Clearer step-by-step instructions on error pages with numbered actions
+- Prominent download button with green styling on completion page
+- Better error recovery guidance with direct links to cookie upload page
+- Improved processing status display with estimated times and auto-refresh reminders
+
 ### Feature Specifications
 - **Video Conversion** (3GP Format):
     - **Resolution**: 176x144 (with aspect ratio padding)
     - **Format**: 3GP with MPEG-4 video and AAC audio
-    - **Quality Presets**: Ultra Low (150k video, 10fps), Low (200k video, 12fps), Medium (300k video, 15fps), High (400k video, 20fps)
+    - **Quality Presets**: Ultra Low (150k video, 10fps), Low (200k video, 12fps), Medium (300k video, 15fps), High (400k video, 18fps)
     - **Video Settings**: Variable bitrate with rate distortion optimization for better compression
     - **Audio Settings**: Fixed at 24kbps AAC, 16kHz, mono (constant across all presets for feature phone compatibility)
     - **Max Duration**: 6 hours (configurable)
@@ -83,11 +90,16 @@ The application features ultra-lightweight HTML templates designed for feature p
 
 ## Recent Updates
 
-### November 2, 2025 (Latest)
+### November 2, 2025 (Latest Update)
+- ✅ **NEW**: Updated High 3GP quality to 18 fps (was 15 fps) for smoother playback
+- ✅ **NEW**: Upgraded YouTube blocking prevention with 2025 user agents (iOS 18.1, Android 14)
+- ✅ **NEW**: Added Android TV download strategy for better reliability
+- ✅ **NEW**: Feature phone UI improvements - clearer status messages, better error recovery
+- ✅ **NEW**: Enhanced download/error pages with emoji indicators and step-by-step guidance
 - ✅ **CRITICAL FIX**: Fixed search function URL construction bug that could return invalid YouTube URLs
 - ✅ **CRITICAL FIX**: Fixed cleanup function to properly delete both .3gp and .mp3 files (was only deleting .3gp)
-- ✅ **NEW**: Auto-download FFmpeg if not found - no more deployment failures!
-- ✅ **NEW**: FFmpeg detection now logs actual paths to help discover Render's locations
+- ✅ Auto-download FFmpeg if not found - no more deployment failures!
+- ✅ FFmpeg detection now logs actual paths to help discover Render's locations
 - ✅ Enhanced search function with comprehensive error handling (timeout, 429, 403, bot detection)
 - ✅ Added cookie support to search requests for better rate-limit handling and bot detection bypass
 - ✅ Added 30-second socket timeout to search for 2G network compatibility
