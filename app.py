@@ -36,11 +36,22 @@ COOKIES_FILE = os.path.join(COOKIES_FOLDER, 'youtube_cookies.txt')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(COOKIES_FOLDER, exist_ok=True)
 
+def parse_filesize(size_str):
+    """Parse filesize string like '500M', '2G' to bytes"""
+    if isinstance(size_str, int):
+        return size_str
+    size_str = str(size_str).strip().upper()
+    multipliers = {'K': 1024, 'M': 1024**2, 'G': 1024**3}
+    for suffix, multiplier in multipliers.items():
+        if size_str.endswith(suffix):
+            return int(float(size_str[:-1]) * multiplier)
+    return int(size_str)
+
 MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))
 DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
 CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
-MAX_FILESIZE = 2147483648
+MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '2G'))
 
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'

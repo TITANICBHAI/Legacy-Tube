@@ -17,5 +17,7 @@ services:
         value: 21600
       - key: FILE_RETENTION_HOURS
         value: 6
+      - key: MAX_FILESIZE
+        value: 500M
       - key: SESSION_SECRET
         generateValue: true
