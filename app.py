@@ -919,6 +919,24 @@ def index():
                          mp3_presets=MP3_QUALITY_PRESETS,
                          video_presets=VIDEO_QUALITY_PRESETS)
 
+@app.route('/mp3')
+def mp3_converter():
+    max_hours = MAX_VIDEO_DURATION / 3600
+    cookies_status = has_cookies()
+    return render_template('mp3.html', 
+                         max_hours=max_hours, 
+                         has_cookies=cookies_status,
+                         mp3_presets=MP3_QUALITY_PRESETS)
+
+@app.route('/3gp')
+def gp3_converter():
+    max_hours = MAX_VIDEO_DURATION / 3600
+    cookies_status = has_cookies()
+    return render_template('3gp.html', 
+                         max_hours=max_hours, 
+                         has_cookies=cookies_status,
+                         video_presets=VIDEO_QUALITY_PRESETS)
+
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
