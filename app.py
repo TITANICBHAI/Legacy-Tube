@@ -480,7 +480,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             base_opts['ratelimit'] = RATE_LIMIT_BYTES
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
 
-        # Download strategies - Updated for YouTube's new restrictions (Nov 2024)
+        # Download strategies - Updated for YouTube's new restrictions (Nov 2025)
         # Multiple clients to bypass bot detection - ordered by reliability
         strategies = [
             {
@@ -491,9 +491,23 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'player_skip': ['configs', 'webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+                        'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_1 like Mac OS X;)',
                         'X-YouTube-Client-Name': '5',
-                        'X-YouTube-Client-Version': '19.29.1'
+                        'X-YouTube-Client-Version': '19.45.4'
+                    }
+                }
+            },
+            {
+                'name': 'Android TV (Highly Reliable)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android_tv'],
+                        'player_skip': ['configs', 'webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.android.youtube.tv/2.41.04 (Linux; U; Android 13; en_US)',
+                        'X-YouTube-Client-Name': '85',
+                        'X-YouTube-Client-Version': '2.41.04'
                     }
                 }
             },
@@ -505,9 +519,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'player_skip': ['configs', 'webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.29.37 (Linux; U; Android 13; en_US)',
+                        'User-Agent': 'com.google.android.youtube/19.45.38 (Linux; U; Android 14; en_US)',
                         'X-YouTube-Client-Name': '3',
-                        'X-YouTube-Client-Version': '19.29.37'
+                        'X-YouTube-Client-Version': '19.45.38'
                     }
                 }
             },
@@ -519,9 +533,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 13) gzip',
+                        'User-Agent': 'com.google.android.apps.youtube.music/7.31.51 (Linux; U; Android 14) gzip',
                         'X-YouTube-Client-Name': '21',
-                        'X-YouTube-Client-Version': '6.42.52'
+                        'X-YouTube-Client-Version': '7.31.51'
                     }
                 }
             },
@@ -533,9 +547,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.apps.youtube.creator/24.06.103 (Linux; U; Android 13)',
+                        'User-Agent': 'com.google.android.apps.youtube.creator/24.43.101 (Linux; U; Android 14)',
                         'X-YouTube-Client-Name': '14',
-                        'X-YouTube-Client-Version': '24.06.103'
+                        'X-YouTube-Client-Version': '24.43.101'
                     }
                 }
             },
@@ -547,7 +561,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                         'Accept-Language': 'en-US,en;q=0.9'
                     }
@@ -561,7 +575,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (PlayStation; PlayStation 5/7.00) AppleWebKit/605.1.15 Chrome/126.0.0.0 Safari/605.1.15'
+                        'User-Agent': 'Mozilla/5.0 (PlayStation; PlayStation 5/9.00) AppleWebKit/605.1.15 Chrome/130.0.0.0 Safari/605.1.15'
                     }
                 }
             }
