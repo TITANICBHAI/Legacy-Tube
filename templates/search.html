@@ -40,11 +40,19 @@
     </p>
     
     <select name="quality" style="width: 100%; padding: 5px; margin: 5px 0; font-size: 12px;">
-    <option value="auto">Auto Quality</option>
-    <option value="low">3GP: Low / MP3: 128k</option>
-    <option value="medium">3GP: Medium / MP3: 192k</option>
-    <option value="high">3GP: High / MP3: 256k</option>
-    <option value="extreme">MP3: 320k Only</option>
+    <option value="auto">Auto (128k MP3 / Low 3GP)</option>
+    <optgroup label="3GP Video">
+    <option value="ultralow">Ultra Low (~1MB/5min)</option>
+    <option value="low">Low (~2MB/5min)</option>
+    <option value="medium">Medium (~2.5MB/5min)</option>
+    <option value="high">High (~3MB/5min)</option>
+    </optgroup>
+    <optgroup label="MP3 Audio">
+    <option value="medium">128kbps (~5MB/5min)</option>
+    <option value="high">192kbps (~7MB/5min)</option>
+    <option value="veryhigh">256kbps (~9MB/5min)</option>
+    <option value="extreme">320kbps (~12MB/5min)</option>
+    </optgroup>
     </select>
     
     <button type="submit">Convert This</button>

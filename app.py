@@ -766,9 +766,14 @@ def cleanup_old_files():
                                     should_delete = True
                         
                         if should_delete:
-                            file_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
+                            # Delete both 3gp and mp3 files if they exist
+                            file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+                            file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
+                            if os.path.exists(file_path_3gp):
+                                os.remove(file_path_3gp)
+                                deleted_count += 1
+                            if os.path.exists(file_path_mp3):
+                                os.remove(file_path_mp3)
                                 deleted_count += 1
                             del status[file_id]
                     except Exception as e:
@@ -900,16 +905,41 @@ def search():
                 'no_warnings': True,
                 'extract_flat': True,
                 'force_generic_extractor': False,
+                'socket_timeout': 30,  # Timeout for 2G networks
             }
             
+            # Add cookies if available (helps with rate limiting and bot detection)
+            if has_cookies():
+                ydl_opts['cookiefile'] = COOKIES_FILE
+            
             results = []
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # Search for up to 10 results
-                search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
-                
-                if search_results and 'entries' in search_results:
-                    for entry in search_results['entries']:
-                        if entry:
+            search_results = None
+            
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    # Search for up to 10 results with timeout protection
+                    search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
+            except yt_dlp.utils.DownloadError as e:
+                error_msg = str(e)
+                logger.error(f"Search DownloadError: {error_msg}")
+                if 'timeout' in error_msg.lower():
+                    flash('Search timed out. Please check your connection and try again.')
+                elif '429' in error_msg or 'too many requests' in error_msg.lower():
+                    flash('Too many search requests. Please wait a few minutes and try again.')
+                elif '403' in error_msg or 'forbidden' in error_msg.lower():
+                    flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
+                else:
+                    flash('YouTube search error. Please try again.')
+                return render_template('search.html', results=None, query=query)
+            except Exception as e:
+                logger.error(f"Search extraction error: {str(e)}")
+                flash('Search failed. Please try again later.')
+                return render_template('search.html', results=None, query=query)
+            
+            # Process search results
+            if search_results and 'entries' in search_results:
+                for entry in search_results['entries']:
+                        if entry and entry.get('id'):  # Ensure entry has an ID
                             duration = entry.get('duration', 0)
                             duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
                             
@@ -934,9 +964,26 @@ def search():
                             else:
                                 view_str = "Unknown views"
                             
+                            # FIXED: Proper URL construction for YouTube videos
+                            # yt-dlp flat extraction may return partial URLs or video IDs
+                            video_id = entry.get('id', '')
+                            video_url = entry.get('url', '')
+                            
+                            # Construct proper YouTube URL
+                            if video_url and video_url.startswith('http'):
+                                # Already a full URL
+                                final_url = video_url
+                            elif video_id:
+                                # Construct from video ID
+                                final_url = f"https://www.youtube.com/watch?v={video_id}"
+                            else:
+                                # Fallback: try to extract from URL field
+                                logger.warning(f"Could not determine URL for search result: {entry.get('title', 'Unknown')}")
+                                continue  # Skip this result
+                            
                             results.append({
                                 'title': entry.get('title', 'Unknown'),
-                                'url': entry.get('url', '') if entry.get('url', '').startswith('http') else f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                                'url': final_url,
                                 'duration': duration_str,
                                 'duration_seconds': duration,
                                 'upload_date': upload_date_str,
@@ -944,12 +991,18 @@ def search():
                                 'views': view_str,
                             })
             
+            # Validate we got results
+            if not results:
+                flash('No results found. Try different search terms.')
+                return render_template('search.html', results=[], query=query)
+            
             return render_template('search.html', results=results, query=query)
             
         except Exception as e:
-            logger.error(f"Search error: {str(e)}")
-            flash(f'Search failed: {str(e)}')
-            return redirect(url_for('search'))
+            # Catch any unexpected errors not handled by inner try-except
+            logger.error(f"Unexpected search error: {str(e)}")
+            flash('An unexpected error occurred. Please try again.')
+            return render_template('search.html', results=None, query=query)
     
     return render_template('search.html', results=None, query='')
 
