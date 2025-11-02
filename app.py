@@ -139,38 +139,38 @@ def download_ffmpeg_binary():
     """Auto-download FFmpeg if not found - helps discover Render's actual paths"""
     try:
         logger.info("FFmpeg not found in expected locations. Attempting auto-download...")
-        
+
         # Try downloading to /tmp first (always writable)
         download_dir = '/tmp/bin'
         os.makedirs(download_dir, exist_ok=True)
-        
+
         ffmpeg_url = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz'
         download_path = os.path.join(download_dir, 'ffmpeg-static.tar.xz')
-        
+
         logger.info(f"Downloading FFmpeg from {ffmpeg_url}...")
         result = subprocess.run(['wget', '-O', download_path, ffmpeg_url], 
                               capture_output=True, timeout=120)
-        
+
         if result.returncode == 0 and os.path.exists(download_path):
             logger.info(f"Download successful! Extracting to {download_dir}...")
             subprocess.run(['tar', '-xJf', download_path, '-C', download_dir, '--strip-components=1'],
                          timeout=60)
             os.remove(download_path)
-            
+
             ffmpeg_binary = os.path.join(download_dir, 'ffmpeg')
             if os.path.exists(ffmpeg_binary):
                 os.chmod(ffmpeg_binary, 0o755)
                 logger.info(f"✓ FFmpeg auto-downloaded successfully to: {ffmpeg_binary}")
                 logger.info(f"✓ DISCOVERED PATH: {ffmpeg_binary} (use this in your config!)")
                 return ffmpeg_binary
-        
+
         logger.warning("Auto-download failed, trying system package manager...")
         # Try apt-get as last resort (works on some systems)
         subprocess.run(['apt-get', 'update'], capture_output=True, timeout=30)
         subprocess.run(['apt-get', 'install', '-y', 'ffmpeg'], capture_output=True, timeout=120)
-        
+
         return 'ffmpeg'  # Hope it's now in PATH
-        
+
     except Exception as e:
         logger.error(f"Auto-download failed: {e}")
         return 'ffmpeg'  # Fallback to system PATH
@@ -185,7 +185,7 @@ def get_ffmpeg_path():
         '/usr/bin/ffmpeg',  # Standard location
         '/usr/local/bin/ffmpeg',  # Alternative location
     ]
-    
+
     # First pass: try all known locations
     for path in possible_paths:
         try:
@@ -195,11 +195,11 @@ def get_ffmpeg_path():
                 return path
         except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
             continue
-    
+
     # Not found - try auto-download
     logger.warning("FFmpeg not found in any expected location - attempting auto-download...")
     downloaded_path = download_ffmpeg_binary()
-    
+
     # Verify the downloaded binary works
     try:
         result = subprocess.run([downloaded_path, '-version'], capture_output=True, timeout=5)
@@ -208,7 +208,7 @@ def get_ffmpeg_path():
             return downloaded_path
     except:
         pass
-    
+
     logger.error("⚠️ FFmpeg not available - conversions may fail!")
     return 'ffmpeg'  # Last resort fallback
 
@@ -222,7 +222,7 @@ def get_ffprobe_path():
         '/usr/bin/ffprobe',  # Standard location
         '/usr/local/bin/ffprobe',  # Alternative location
     ]
-    
+
     for path in possible_paths:
         try:
             result = subprocess.run([path, '-version'], capture_output=True, timeout=5)
@@ -231,7 +231,7 @@ def get_ffprobe_path():
                 return path
         except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
             continue
-    
+
     logger.info("FFprobe not found (not critical - FFmpeg can handle duration detection)")
     return 'ffprobe'  # Fallback to system PATH
 
@@ -269,11 +269,11 @@ def update_status(file_id, updates):
                 status = {}
         else:
             status = {}
-        
+
         if file_id not in status:
             status[file_id] = {}
         status[file_id].update(updates)
-        
+
         temp_file = STATUS_FILE + '.tmp'
         with open(temp_file, 'w') as f:
             json.dump(status, f)
@@ -292,9 +292,9 @@ def check_disk_space():
         free_mb = free / (1024 * 1024)
         used_mb = used / (1024 * 1024)
         total_mb = total / (1024 * 1024)
-        
+
         logger.info(f"Disk space: {free_mb:.0f}MB free / {total_mb:.0f}MB total ({used_mb:.0f}MB used)")
-        
+
         if free_mb < DISK_SPACE_THRESHOLD_MB:
             logger.warning(f"⚠️ Low disk space: {free_mb:.0f}MB free (threshold: {DISK_SPACE_THRESHOLD_MB}MB)")
             return False, free_mb
@@ -307,12 +307,12 @@ def clean_tmp_immediately():
     """Emergency cleanup of /tmp when space is low"""
     try:
         import glob
-        
+
         # Clean downloads folder
         files = glob.glob(os.path.join(DOWNLOAD_FOLDER, '*'))
         deleted = 0
         freed_mb = 0
-        
+
         for filepath in files:
             try:
                 size_mb = os.path.getsize(filepath) / (1024 * 1024)
@@ -321,7 +321,7 @@ def clean_tmp_immediately():
                 freed_mb += size_mb
             except:
                 pass
-        
+
         logger.info(f"Emergency cleanup: deleted {deleted} files, freed {freed_mb:.1f}MB")
         return freed_mb
     except Exception as e:
@@ -350,40 +350,40 @@ def has_cookies():
 def validate_cookies():
     if not has_cookies():
         return False, "No cookies file found"
-    
+
     try:
         with open(COOKIES_FILE, 'r') as f:
             content = f.read()
-            
+
             if 'youtube.com' not in content.lower():
                 return False, "Cookie file does not contain YouTube cookies"
-            
+
             if len(content.strip()) < 50:
                 return False, "Cookie file appears to be empty or invalid"
-            
+
             lines = content.strip().split('\n')
             has_youtube_cookies = False
-            
+
             for line in lines:
                 if line.startswith('#') or not line.strip():
                     continue
-                
+
                 parts = line.split('\t')
                 if len(parts) >= 7:
                     domain = parts[0]
                     cookie_name = parts[5]
-                    
+
                     if 'youtube.com' in domain.lower():
                         has_youtube_cookies = True
-                        
+
                         if cookie_name in ['LOGIN_INFO', '__Secure-1PSID', '__Secure-3PSID']:
                             return True, "Valid YouTube cookies with authentication token found"
-            
+
             if has_youtube_cookies:
                 return False, "YouTube cookies found but missing LOGIN_INFO or session tokens. Please export cookies while logged into YouTube, or from a fresh youtube.com visit."
             else:
                 return False, "No YouTube cookies detected in file"
-            
+
     except Exception as e:
         return False, f"Error reading cookies: {str(e)}"
 
@@ -401,17 +401,17 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     'progress': f'Server storage full ({free_mb:.0f}MB free). Please try again in a few minutes after cleanup.'
                 })
                 return
-    
+
     file_extension = 'mp3' if output_format == 'mp3' else '3gp'
     format_name = 'MP3 audio' if output_format == 'mp3' else '3GP video'
-    
+
     # Auto-select quality if not specified
     if quality == 'auto':
         if output_format == 'mp3':
             quality = 'medium'  # 128kbps default for MP3
         else:
             quality = 'low'  # Low quality default for 3GP (feature phone optimized)
-    
+
     # Validate quality preset
     if output_format == 'mp3':
         if quality not in MP3_QUALITY_PRESETS:
@@ -421,21 +421,31 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
         if quality not in VIDEO_QUALITY_PRESETS:
             quality = 'low'
         quality_preset = VIDEO_QUALITY_PRESETS[quality]
-    
+
     update_status(file_id, {
         'status': 'downloading',
         'progress': f'Downloading from YouTube for {format_name} conversion ({quality_preset["name"]})... (this may take several minutes for long videos)',
         'url': url,
         'timestamp': datetime.now().isoformat()
     })
-    
+
     output_path = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.{file_extension}')
     temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
-    
+
     try:
         # Base yt-dlp options (using Python API instead of subprocess)
+        # Use flexible format selection to avoid "Requested format not available" errors
+        # Priority: smaller files for feature phones, but fallback to any available format
+        if output_format == 'mp3':
+            # For audio: get best audio, any format
+            format_str = 'bestaudio/best'
+        else:
+            # For video: prefer smaller files but accept anything available
+            # Try: low quality video+audio, then medium, then any available
+            format_str = 'worst[height<=480]+worstaudio/bestvideo[height<=480]+bestaudio/best[height<=480]/worst+worstaudio/best'
+
         base_opts = {
-            'format': 'worst/best',
+            'format': format_str,
             'merge_output_format': 'mp4',
             'outtmpl': temp_video,
             'max_filesize': MAX_FILESIZE,
@@ -453,24 +463,24 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             'no_warnings': False,
             'logger': logger,
         }
-        
+
         # YouTube IP block bypass: Use IPv6 if enabled (less blocked by YouTube)
         if USE_IPV6:
             base_opts['force_ipv6'] = True
             logger.info(f"Using IPv6 for download (IP block bypass)")
         else:
             base_opts['force_ipv4'] = True
-        
+
         # Add proxy if configured (bypass cloud IP blocks)
         if PROXY_URL:
             base_opts['proxy'] = PROXY_URL
             logger.info(f"Using proxy for download (IP block bypass)")
-        
+
         # Add rate limiting if configured (avoid 429 errors)
         if RATE_LIMIT_BYTES > 0:
             base_opts['ratelimit'] = RATE_LIMIT_BYTES
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
-        
+
         # Download strategies - Updated for YouTube's new restrictions (Nov 2024)
         # Simplified to avoid PO Token requirements and bot detection
         strategies = [
@@ -530,14 +540,14 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             }
         ]
-        
+
         # Add cookies if available
         if has_cookies():
             base_opts['cookiefile'] = COOKIES_FILE
-        
+
         last_error = None
         download_success = False
-        
+
         for i, strategy in enumerate(strategies):
             try:
                 if i > 0:
@@ -546,27 +556,27 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'progress': f'Retrying with {strategy["name"]} client... (attempt {i+1}/{len(strategies)})'
                     })
                     time.sleep(3 * i)
-                
+
                 # Merge strategy options with base options
                 ydl_opts = {**base_opts, **strategy['opts']}
-                
+
                 logger.info(f"Attempting download with {strategy['name']} strategy for {file_id}")
-                
+
                 # Use yt-dlp Python API instead of subprocess
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(url, download=True)
-                    
+
                 if os.path.exists(temp_video) and os.path.getsize(temp_video) > 0:
                     logger.info(f"Download successful with {strategy['name']} for {file_id}")
                     download_success = True
                     break
                 else:
                     logger.warning(f"{strategy['name']} strategy failed - file not created or empty")
-                    
+
             except yt_dlp.utils.DownloadError as e:
                 last_error = str(e)
                 error_lower = last_error.lower()
-                
+
                 # Detect IP blocking specifically
                 if '403' in last_error or 'forbidden' in error_lower or 'bot' in error_lower:
                     logger.warning(f"⚠️ Possible IP block detected with {strategy['name']}: {last_error[:200]}")
@@ -579,30 +589,30 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 last_error = str(e)
                 logger.error(f"{strategy['name']} unexpected error for {file_id}: {last_error}")
                 continue
-        
+
         if not download_success:
             error_msg = last_error if last_error else "All download strategies failed"
             error_lower = error_msg.lower()
-            
+
             # Check if cookies would help
             cookies_help = " → Try uploading YouTube cookies from /cookies page to fix this." if not has_cookies() else ""
-            
+
             # Enhanced error detection with cookie suggestions
             if '403' in error_msg or 'forbidden' in error_lower:
                 raise Exception(f"⚠️ YouTube IP BLOCK detected! YouTube is blocking downloads from this server.{cookies_help if cookies_help else ' Try using fresh cookies from /cookies page.'}")
-            
+
             if 'po token' in error_lower or 'po_token' in error_lower:
                 raise Exception(f"⚠️ YouTube now requires PO tokens for some videos. Upload YouTube cookies from /cookies page to bypass this restriction.")
-            
+
             if 'failed to extract' in error_lower or 'failed to parse' in error_lower:
                 raise Exception(f"⚠️ YouTube blocked the video extraction. This is a bot detection measure.{cookies_help}")
-            
+
             if 'video player configuration error' in error_lower or 'error 153' in error_lower:
                 raise Exception(f"⚠️ YouTube player error (Error 153). This video has restricted playback.{cookies_help}")
-            
+
             if 'bot' in error_lower and ('sign in' in error_lower or 'confirm' in error_lower):
                 raise Exception(f"⚠️ YouTube bot detection triggered!{cookies_help if cookies_help else ' Try fresh cookies from /cookies page.'}")
-            
+
             if 'duration' in error_lower:
                 raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
             if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
@@ -624,20 +634,20 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     raise Exception("YouTube authentication failed. Upload fresh cookies from /cookies page.")
                 else:
                     raise Exception(f"YouTube requires sign-in verification.{cookies_help}")
-            
+
             raise Exception(f"Download failed: {error_msg[:200]}{cookies_help}")
-        
+
         if not os.path.exists(temp_video):
             raise Exception("Download failed: Video file not created")
-        
+
         duration = get_video_duration(temp_video)
         if duration > MAX_VIDEO_DURATION:
             os.remove(temp_video)
             raise Exception(f"Video is {duration/3600:.1f} hours long. Maximum allowed is {MAX_VIDEO_DURATION/3600:.0f} hours.")
-        
+
         file_size = os.path.getsize(temp_video)
         file_size_mb = file_size / (1024 * 1024)
-        
+
         # Check disk space AGAIN before conversion (video might be large)
         if ENABLE_DISK_SPACE_MONITORING:
             has_space, free_mb = check_disk_space()
@@ -645,15 +655,15 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 logger.warning(f"Insufficient space for conversion: {free_mb:.0f}MB free, need ~{file_size_mb*1.5:.0f}MB")
                 os.remove(temp_video)
                 raise Exception(f"Insufficient disk space for conversion. Downloaded video is {file_size_mb:.1f}MB but only {free_mb:.0f}MB free. Try a shorter video.")
-        
+
         est_time = max(1, int(duration / 60))
-        
+
         if output_format == 'mp3':
             update_status(file_id, {
                 'status': 'converting',
                 'progress': f'Converting to MP3 audio ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
             })
-            
+
             # MP3 conversion with quality preset
             convert_cmd = [
                 FFMPEG_PATH,
@@ -674,12 +684,12 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 'status': 'converting',
                 'progress': f'Converting to 3GP video ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
             })
-            
+
             # 3GP video conversion with quality preset and compression
             video_bitrate_num = int(quality_preset['video_bitrate'].replace('k', ''))
             maxrate = f"{int(video_bitrate_num * 1.25)}k"  # 25% higher maxrate for better quality
             bufsize = f"{int(video_bitrate_num * 2)}k"  # Buffer size for smooth streaming
-            
+
             convert_cmd = [
                 FFMPEG_PATH,
                 '-i', temp_video,
@@ -700,17 +710,17 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-y',
                 output_path
             ]
-        
+
         dynamic_timeout = max(CONVERSION_TIMEOUT, int(duration * 2))
         result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
-        
+
         if result.returncode != 0:
             error_msg = result.stderr[:300] if result.stderr else "Unknown FFmpeg error"
             logger.error(f"FFmpeg conversion failed for {file_id}: {error_msg}")
-            
+
             # Retry once with simpler encoding if first attempt fails
             logger.info(f"Retrying conversion with simpler settings for {file_id}")
-            
+
             if output_format == 'mp3':
                 simple_cmd = [
                     FFMPEG_PATH,
@@ -740,9 +750,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     '-y',
                     output_path
                 ]
-            
+
             retry_result = subprocess.run(simple_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
-            
+
             if retry_result.returncode != 0:
                 # Clean up temp file before raising exception
                 if os.path.exists(temp_video):
@@ -751,23 +761,23 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     except:
                         pass
                 raise Exception(f"Conversion failed after retry: {error_msg}")
-        
+
         # Clean up temp video after successful conversion
         if os.path.exists(temp_video):
             try:
                 os.remove(temp_video)
             except:
                 pass
-        
+
         if not os.path.exists(output_path):
             raise Exception("Conversion failed: Output file not created")
-        
+
         final_size = os.path.getsize(output_path)
         final_size_mb = final_size / (1024 * 1024)
-        
+
         # Use correct filename extension based on format
         filename_with_ext = f'{file_id}.{file_extension}'
-        
+
         update_status(file_id, {
             'status': 'completed',
             'progress': f'Conversion complete! Duration: {duration/60:.1f} min, File size: {final_size_mb:.2f} MB',
@@ -776,7 +786,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             'duration': duration,
             'completed_at': datetime.now().isoformat()
         })
-        
+
     except subprocess.TimeoutExpired:
         logger.error(f"Timeout processing {file_id}")
         update_status(file_id, {
@@ -799,7 +809,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 os.remove(temp_video)
             except:
                 pass
-        
+
         # Cleanup output if partially created
         if os.path.exists(output_path):
             try:
@@ -811,10 +821,10 @@ def cleanup_old_files():
     while True:
         try:
             time.sleep(1800)
-            
+
             cutoff_time = datetime.now() - timedelta(hours=FILE_RETENTION_HOURS)
             deleted_count = 0
-            
+
             with status_lock:
                 if os.path.exists(STATUS_FILE):
                     try:
@@ -824,11 +834,11 @@ def cleanup_old_files():
                         status = {}
                 else:
                     status = {}
-                
+
                 for file_id, data in list(status.items()):
                     try:
                         should_delete = False
-                        
+
                         if 'completed_at' in data:
                             completed_time = datetime.fromisoformat(data['completed_at'])
                             if completed_time < cutoff_time:
@@ -838,7 +848,7 @@ def cleanup_old_files():
                             if start_time < cutoff_time:
                                 if data.get('status') in ['failed', 'unknown', 'downloading', 'converting']:
                                     should_delete = True
-                        
+
                         if should_delete:
                             # Delete both 3gp and mp3 files if they exist
                             file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
@@ -853,12 +863,12 @@ def cleanup_old_files():
                     except Exception as e:
                         print(f"Error cleaning file {file_id}: {e}")
                         continue
-                
+
                 temp_file = STATUS_FILE + '.tmp'
                 with open(temp_file, 'w') as f:
                     json.dump(status, f)
                 os.replace(temp_file, STATUS_FILE)
-            
+
             for filename in os.listdir(DOWNLOAD_FOLDER):
                 try:
                     file_path = os.path.join(DOWNLOAD_FOLDER, filename)
@@ -870,10 +880,10 @@ def cleanup_old_files():
                 except Exception as e:
                     print(f"Error removing orphan file {filename}: {e}")
                     continue
-            
+
             if deleted_count > 0:
                 print(f"Cleanup completed: Deleted {deleted_count} old files")
-                        
+
         except Exception as e:
             print(f"Cleanup error: {e}")
 
@@ -923,24 +933,24 @@ def convert():
     url = request.form.get('url', '').strip()
     output_format = request.form.get('format', '3gp').strip()
     quality = request.form.get('quality', 'auto').strip()
-    
+
     if not url:
         flash('Please enter a YouTube URL')
         return redirect(url_for('index'))
-    
+
     if 'youtube.com' not in url and 'youtu.be' not in url:
         flash('Please enter a valid YouTube URL')
         return redirect(url_for('index'))
-    
+
     if output_format not in ['3gp', 'mp3']:
         output_format = '3gp'
-    
+
     file_id = generate_file_id(url)
-    
+
     thread = threading.Thread(target=download_and_convert, args=(url, file_id, output_format, quality))
     thread.daemon = True
     thread.start()
-    
+
     return redirect(url_for('status', file_id=file_id))
 
 @app.route('/status/<file_id>')
@@ -954,7 +964,7 @@ def download(file_id):
     # Check for both 3gp and mp3 files
     file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
     file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
-    
+
     if os.path.exists(file_path_3gp):
         return send_file(file_path_3gp, as_attachment=True, download_name=f'video_{file_id}.3gp')
     elif os.path.exists(file_path_mp3):
@@ -967,11 +977,11 @@ def download(file_id):
 def search():
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
-        
+
         if not query:
             flash('Please enter a search term')
             return redirect(url_for('search'))
-        
+
         try:
             # Use yt-dlp to search YouTube (no API key required)
             ydl_opts = {
@@ -981,14 +991,14 @@ def search():
                 'force_generic_extractor': False,
                 'socket_timeout': 30,  # Timeout for 2G networks
             }
-            
+
             # Add cookies if available (helps with rate limiting and bot detection)
             if has_cookies():
                 ydl_opts['cookiefile'] = COOKIES_FILE
-            
+
             results = []
             search_results = None
-            
+
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     # Search for up to 10 results with timeout protection
@@ -1009,14 +1019,14 @@ def search():
                 logger.error(f"Search extraction error: {str(e)}")
                 flash('Search failed. Please try again later.')
                 return render_template('search.html', results=None, query=query)
-            
+
             # Process search results
             if search_results and 'entries' in search_results:
                 for entry in search_results['entries']:
                         if entry and entry.get('id'):  # Ensure entry has an ID
                             duration = entry.get('duration', 0)
                             duration_str = f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "Unknown"
-                            
+
                             # Format upload date
                             upload_date = entry.get('upload_date', '')
                             upload_date_str = "Unknown"
@@ -1025,7 +1035,7 @@ def search():
                                     upload_date_str = f"{upload_date[6:8]}/{upload_date[4:6]}/{upload_date[0:4]}"
                                 except:
                                     upload_date_str = "Unknown"
-                            
+
                             # Format view count
                             view_count = entry.get('view_count', 0)
                             if view_count:
@@ -1037,12 +1047,12 @@ def search():
                                     view_str = f"{view_count} views"
                             else:
                                 view_str = "Unknown views"
-                            
+
                             # FIXED: Proper URL construction for YouTube videos
                             # yt-dlp flat extraction may return partial URLs or video IDs
                             video_id = entry.get('id', '')
                             video_url = entry.get('url', '')
-                            
+
                             # Construct proper YouTube URL
                             if video_url and video_url.startswith('http'):
                                 # Already a full URL
@@ -1054,7 +1064,7 @@ def search():
                                 # Fallback: try to extract from URL field
                                 logger.warning(f"Could not determine URL for search result: {entry.get('title', 'Unknown')}")
                                 continue  # Skip this result
-                            
+
                             results.append({
                                 'title': entry.get('title', 'Unknown'),
                                 'url': final_url,
@@ -1064,20 +1074,20 @@ def search():
                                 'channel': entry.get('channel', entry.get('uploader', 'Unknown')),
                                 'views': view_str,
                             })
-            
+
             # Validate we got results
             if not results:
                 flash('No results found. Try different search terms.')
                 return render_template('search.html', results=[], query=query)
-            
+
             return render_template('search.html', results=results, query=query)
-            
+
         except Exception as e:
             # Catch any unexpected errors not handled by inner try-except
             logger.error(f"Unexpected search error: {str(e)}")
             flash('An unexpected error occurred. Please try again.')
             return render_template('search.html', results=None, query=query)
-    
+
     return render_template('search.html', results=None, query='')
 
 @app.route('/cookies', methods=['GET', 'POST'])
@@ -1088,24 +1098,24 @@ def cookies_page():
             if file.filename == '':
                 flash('No file selected')
                 return redirect(url_for('cookies_page'))
-            
+
             if file and file.filename and file.filename.endswith('.txt'):
                 try:
                     content = file.read().decode('utf-8')
-                    
+
                     if 'youtube.com' not in content.lower():
                         flash('Invalid cookie file: must contain YouTube cookies')
                         return redirect(url_for('cookies_page'))
-                    
+
                     with open(COOKIES_FILE, 'w') as f:
                         f.write(content)
-                    
+
                     is_valid, validation_msg = validate_cookies()
                     if not is_valid:
                         os.remove(COOKIES_FILE)
                         flash(f'Cookie validation failed: {validation_msg}')
                         return redirect(url_for('cookies_page'))
-                    
+
                     flash('Cookies uploaded and validated successfully!')
                     return redirect(url_for('cookies_page'))
                 except Exception as e:
@@ -1114,7 +1124,7 @@ def cookies_page():
             else:
                 flash('Please upload a .txt file')
                 return redirect(url_for('cookies_page'))
-        
+
         elif 'delete_cookies' in request.form:
             try:
                 if os.path.exists(COOKIES_FILE):
@@ -1123,10 +1133,10 @@ def cookies_page():
             except Exception as e:
                 flash(f'Error deleting cookies: {str(e)}')
             return redirect(url_for('cookies_page'))
-    
+
     cookies_exist = has_cookies()
     is_valid, message = validate_cookies() if cookies_exist else (False, "No cookies uploaded")
-    
+
     return render_template('cookies.html', 
                          cookies_exist=cookies_exist, 
                          is_valid=is_valid, 
