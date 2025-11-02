@@ -481,8 +481,22 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
 
         # Download strategies - Updated for YouTube's new restrictions (Nov 2024)
-        # Simplified to avoid PO Token requirements and bot detection
+        # Multiple clients to bypass bot detection - trying most reliable first
         strategies = [
+            {
+                'name': 'Android TV Embedded (Best for Downloads)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android_embedded'],
+                        'player_skip': ['configs', 'webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.android.youtube/19.29.37 (Linux; U; Android 13; en_US)',
+                        'X-YouTube-Client-Name': '3',
+                        'X-YouTube-Client-Version': '19.29.37'
+                    }
+                }
+            },
             {
                 'name': 'iOS Client (Most Reliable)',
                 'opts': {
@@ -494,6 +508,20 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                         'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
                         'X-YouTube-Client-Name': '5',
                         'X-YouTube-Client-Version': '19.29.1'
+                    }
+                }
+            },
+            {
+                'name': 'Android Music (Less Restricted)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android_music'],
+                        'player_skip': ['configs']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 13) gzip',
+                        'X-YouTube-Client-Name': '21',
+                        'X-YouTube-Client-Version': '6.42.52'
                     }
                 }
             },
@@ -526,15 +554,14 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             },
             {
-                'name': 'Web Client (Last Resort)',
+                'name': 'TV Embedded (Low Detection)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['web']
+                        'player_client': ['tv_embedded'],
+                        'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9'
+                        'User-Agent': 'Mozilla/5.0 (CrKey) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
                     }
                 }
             }
@@ -997,6 +1024,9 @@ def download(file_id):
 
 @app.route('/search', methods=['GET', 'POST'])
 def search():
+    # Check if showing thumbnails (default: no, to save data on 2G)
+    show_thumbnails = request.args.get('show_thumbnails', '0') == '1'
+    
     if request.method == 'POST':
         query = request.form.get('query', '').strip()
 
@@ -1036,11 +1066,11 @@ def search():
                     flash('YouTube blocked the search. Try uploading cookies from /cookies page.')
                 else:
                     flash('YouTube search error. Please try again.')
-                return render_template('search.html', results=None, query=query)
+                return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
             except Exception as e:
                 logger.error(f"Search extraction error: {str(e)}")
                 flash('Search failed. Please try again later.')
-                return render_template('search.html', results=None, query=query)
+                return render_template('search.html', results=None, query=query, show_thumbnails=show_thumbnails)
 
             # Process search results
             if search_results and 'entries' in search_results:
@@ -1104,9 +1134,9 @@ def search():
             # Validate we got results
             if not results:
                 flash('No results found. Try different search terms.')
-                return render_template('search.html', results=[], query=query)
+                return render_template('search.html', results=[], query=query, show_thumbnails=show_thumbnails)
 
-            return render_template('search.html', results=results, query=query)
+            return render_template('search.html', results=results, query=query, show_thumbnails=show_thumbnails)
 
         except Exception as e:
             # Catch any unexpected errors not handled by inner try-except
@@ -1114,7 +1144,7 @@ def search():
             flash('An unexpected error occurred. Please try again.')
             return render_template('search.html', results=None, query=query)
 
-    return render_template('search.html', results=None, query='')
+    return render_template('search.html', results=None, query='', show_thumbnails=show_thumbnails)
 
 @app.route('/cookies', methods=['GET', 'POST'])
 def cookies_page():
