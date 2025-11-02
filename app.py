@@ -40,7 +40,7 @@ MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))
 DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 3600))
 CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 21600))
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
-MAX_FILESIZE = os.environ.get('MAX_FILESIZE', '2G')
+MAX_FILESIZE = 2147483648
 
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
@@ -460,67 +460,61 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             base_opts['ratelimit'] = RATE_LIMIT_BYTES
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
         
-        # Download strategies - Enhanced with better IP block bypass
-        # These strategies mimic real devices to avoid detection
+        # Download strategies - Updated for YouTube's new restrictions (Nov 2024)
+        # Simplified to avoid PO Token requirements and bot detection
         strategies = [
             {
-                'name': 'Android TV (Best for Cloud IPs)',
+                'name': 'iOS Client (Most Reliable)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['android_embedded', 'android_creator', 'android'],
-                        'player_skip': ['webpage', 'configs']
+                        'player_client': ['ios'],
+                        'player_skip': ['configs', 'webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 14; en_US) gzip',
-                        'Accept': '*/*',
-                        'Accept-Encoding': 'gzip, deflate',
-                        'Accept-Language': 'en-US,en;q=0.9'
+                        'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)',
+                        'X-YouTube-Client-Name': '5',
+                        'X-YouTube-Client-Version': '19.29.1'
                     }
                 }
             },
             {
-                'name': 'iOS App (Anti-Bot)',
+                'name': 'Android Client (Fallback)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['ios', 'ios_creator', 'android'],
-                        'player_skip': ['webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.ios.youtube/19.09.3 (iPhone16,2; U; CPU iOS 17_0 like Mac OS X)',
-                        'Accept': '*/*',
-                        'Accept-Encoding': 'gzip, deflate, br',
-                        'Accept-Language': 'en-US,en;q=0.9'
-                    }
-                }
-            },
-            {
-                'name': 'Android Mobile (Fallback)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['android', 'android_music', 'web'],
+                        'player_client': ['android'],
                         'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Referer': 'https://www.youtube.com/'
+                        'User-Agent': 'com.google.android.youtube/19.29.37 (Linux; U; Android 13; en_US)',
+                        'X-YouTube-Client-Name': '3',
+                        'X-YouTube-Client-Version': '19.29.37'
                     }
                 }
             },
             {
-                'name': 'Web Embedded (Last Resort)',
+                'name': 'Mobile Web (Alternative)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['web_embedded', 'web_creator', 'web'],
-                        'player_skip': ['webpage']
+                        'player_client': ['mweb'],
+                        'player_skip': ['configs']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Referer': 'https://www.youtube.com/',
-                        'Origin': 'https://www.youtube.com'
+                        'Accept-Language': 'en-US,en;q=0.9'
+                    }
+                }
+            },
+            {
+                'name': 'Web Client (Last Resort)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['web']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9'
                     }
                 }
             }
@@ -579,35 +573,48 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             error_msg = last_error if last_error else "All download strategies failed"
             error_lower = error_msg.lower()
             
-            # Enhanced error detection for IP blocking
+            # Check if cookies would help
+            cookies_help = " → Try uploading YouTube cookies from /cookies page to fix this." if not has_cookies() else ""
+            
+            # Enhanced error detection with cookie suggestions
             if '403' in error_msg or 'forbidden' in error_lower:
-                raise Exception("⚠️ YouTube IP BLOCK detected! This happens when YouTube blocks your server's IP address. Solutions: 1) Upload cookies from /cookies page, 2) Set USE_IPV6=true in environment, 3) Configure PROXY_URL, or 4) Try a different hosting platform. See documentation for details.")
+                raise Exception(f"⚠️ YouTube IP BLOCK detected! YouTube is blocking downloads from this server.{cookies_help if cookies_help else ' Try using fresh cookies from /cookies page.'}")
+            
+            if 'po token' in error_lower or 'po_token' in error_lower:
+                raise Exception(f"⚠️ YouTube now requires PO tokens for some videos. Upload YouTube cookies from /cookies page to bypass this restriction.")
+            
+            if 'failed to extract' in error_lower or 'failed to parse' in error_lower:
+                raise Exception(f"⚠️ YouTube blocked the video extraction. This is a bot detection measure.{cookies_help}")
+            
+            if 'video player configuration error' in error_lower or 'error 153' in error_lower:
+                raise Exception(f"⚠️ YouTube player error (Error 153). This video has restricted playback.{cookies_help}")
+            
             if 'bot' in error_lower and ('sign in' in error_lower or 'confirm' in error_lower):
-                raise Exception("⚠️ YouTube bot detection triggered! Upload cookies from /cookies page or wait 10-15 minutes before trying again. See ERROR_GUIDE.md for solutions.")
+                raise Exception(f"⚠️ YouTube bot detection triggered!{cookies_help if cookies_help else ' Try fresh cookies from /cookies page.'}")
             
             if 'duration' in error_lower:
                 raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
             if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
-                raise Exception(f"Video file too large (limit: {MAX_FILESIZE})")
+                raise Exception(f"Video file too large (limit: 2GB)")
             if '429' in error_msg or 'too many requests' in error_msg.lower():
-                raise Exception("YouTube rate limit reached. Please wait 5-10 minutes and try again.")
+                raise Exception(f"YouTube rate limit reached. Wait 5-10 minutes and try again.{cookies_help}")
             if 'age' in error_msg.lower() and 'restricted' in error_msg.lower():
-                raise Exception("Video is age-restricted. Cannot download without YouTube account.")
+                raise Exception(f"Video is age-restricted. Upload cookies from /cookies page to access it.")
             if 'private' in error_msg.lower() or 'members-only' in error_msg.lower():
                 raise Exception("Video is private or members-only. Cannot download.")
-            if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower() or 'not made this video available in your country' in error_msg.lower():
-                raise Exception("Video is geo-restricted by the uploader and not available in your region. Try a different video or use a VPN to access region-locked content.")
+            if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower():
+                raise Exception("Video is geo-restricted and not available in your region.")
             if 'copyright' in error_msg.lower() or 'removed' in error_msg.lower():
                 raise Exception("Video removed due to copyright claim or deletion.")
             if 'live' in error_msg.lower() and 'stream' in error_msg.lower():
                 raise Exception("Cannot download live streams. Try again after the stream ends.")
-            if 'sign in' in error_msg.lower() or 'login' in error_msg.lower() or 'bot' in error_msg.lower():
+            if 'sign in' in error_msg.lower() or 'login' in error_msg.lower():
                 if has_cookies():
-                    raise Exception("YouTube authentication failed even with cookies. Try: 1) Upload fresh cookies from /cookies page, or 2) Wait 10 minutes and retry.")
+                    raise Exception("YouTube authentication failed. Upload fresh cookies from /cookies page.")
                 else:
-                    raise Exception("YouTube is asking for sign-in verification. This video may work with cookies - see /cookies page for optional setup. Or try a different video.")
+                    raise Exception(f"YouTube requires sign-in verification.{cookies_help}")
             
-            raise Exception(f"Download failed: {error_msg[:200]}")
+            raise Exception(f"Download failed: {error_msg[:200]}{cookies_help}")
         
         if not os.path.exists(temp_video):
             raise Exception("Download failed: Video file not created")
