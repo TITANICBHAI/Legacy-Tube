@@ -128,7 +128,7 @@ VIDEO_QUALITY_PRESETS = {
         'video_bitrate': '400k',
         'audio_bitrate': '320k',
         'audio_sample_rate': '48000',
-        'fps': '15',
+        'fps': '18',
         'description': '~6 MB per 5 min'
     }
 }
