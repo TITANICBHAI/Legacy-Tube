@@ -105,7 +105,7 @@ VIDEO_QUALITY_PRESETS = {
     'ultralow': {
         'name': 'Ultra Low (2G Networks)',
         'video_bitrate': '150k',
-        'audio_bitrate': '128k',
+        'audio_bitrate': '96k',
         'audio_sample_rate': '44100',
         'fps': '10',
         'description': '~2 MB per 5 min'
@@ -121,7 +121,7 @@ VIDEO_QUALITY_PRESETS = {
     'medium': {
         'name': 'Medium (Better Quality)',
         'video_bitrate': '300k',
-        'audio_bitrate': '192k',
+        'audio_bitrate': '256k',
         'audio_sample_rate': '44100',
         'fps': '15',
         'description': '~4 MB per 5 min'
