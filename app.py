@@ -480,39 +480,12 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             base_opts['ratelimit'] = RATE_LIMIT_BYTES
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
 
-        # Download strategies - Updated for YouTube's new restrictions (Nov 2025)
-        # Multiple clients to bypass bot detection - ordered by reliability
+        # Download strategies - RELIABLE METHODS FIRST (Nov 2025)
+        # Android and Android Music work best - try these FIRST for fast success
+        # Improved fallbacks with better headers and TV client instead of broken mweb
         strategies = [
             {
-                'name': 'iOS Client (Most Reliable)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['ios'],
-                        'player_skip': ['configs', 'webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_1 like Mac OS X;)',
-                        'X-YouTube-Client-Name': '5',
-                        'X-YouTube-Client-Version': '19.45.4'
-                    }
-                }
-            },
-            {
-                'name': 'Android TV (Highly Reliable)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['android_tv'],
-                        'player_skip': ['configs', 'webpage']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'com.google.android.youtube.tv/2.41.04 (Linux; U; Android 13; en_US)',
-                        'X-YouTube-Client-Name': '85',
-                        'X-YouTube-Client-Version': '2.41.04'
-                    }
-                }
-            },
-            {
-                'name': 'Android Client (Best Compatibility)',
+                'name': 'Android Client (Most Reliable)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android'],
@@ -521,12 +494,14 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     'http_headers': {
                         'User-Agent': 'com.google.android.youtube/19.45.38 (Linux; U; Android 14; en_US)',
                         'X-YouTube-Client-Name': '3',
-                        'X-YouTube-Client-Version': '19.45.38'
+                        'X-YouTube-Client-Version': '19.45.38',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept': '*/*'
                     }
                 }
             },
             {
-                'name': 'Android Music (Less Restricted)',
+                'name': 'Android Music (Reliable)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android_music'],
@@ -535,47 +510,41 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     'http_headers': {
                         'User-Agent': 'com.google.android.apps.youtube.music/7.31.51 (Linux; U; Android 14) gzip',
                         'X-YouTube-Client-Name': '21',
-                        'X-YouTube-Client-Version': '7.31.51'
+                        'X-YouTube-Client-Version': '7.31.51',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept': '*/*'
                     }
                 }
             },
             {
-                'name': 'Android Creator (Alternative)',
+                'name': 'iOS Client (Enhanced)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['android_creator'],
-                        'player_skip': ['configs']
+                        'player_client': ['ios'],
+                        'player_skip': ['configs', 'webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'com.google.android.apps.youtube.creator/24.43.101 (Linux; U; Android 14)',
-                        'X-YouTube-Client-Name': '14',
-                        'X-YouTube-Client-Version': '24.43.101'
-                    }
-                }
-            },
-            {
-                'name': 'Mobile Web (Fallback)',
-                'opts': {
-                    'extractor_args': {'youtube': {
-                        'player_client': ['mweb'],
-                        'player_skip': ['configs']
-                    }},
-                    'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1',
+                        'User-Agent': 'com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_1 like Mac OS X;)',
+                        'X-YouTube-Client-Name': '5',
+                        'X-YouTube-Client-Version': '19.45.4',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.9'
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Referer': 'https://www.youtube.com/'
                     }
                 }
             },
             {
-                'name': 'TV Embedded (Last Resort)',
+                'name': 'TV Client (Alternative)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['tv_embedded'],
+                        'player_client': ['tv'],
                         'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (PlayStation; PlayStation 5/9.00) AppleWebKit/605.1.15 Chrome/130.0.0.0 Safari/605.1.15'
+                        'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
+                        'Accept': '*/*',
+                        'Accept-Language': 'en-US,en;q=0.9'
                     }
                 }
             }

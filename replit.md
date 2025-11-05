@@ -47,7 +47,7 @@ The application features ultra-lightweight HTML templates designed for feature p
 - **YouTube Authentication**: Supports cookie-based authentication to bypass YouTube's bot detection and rate limiting, allowing access to most public videos without requiring a logged-in YouTube account.
 - **Background Processing**: Video download and conversion occur asynchronously using Python threading, with status updates available on a dedicated page.
 - **File Management**: Automatic cleanup system deletes converted files after 6 hours and manages orphaned/failed jobs.
-- **Network Optimization**: Designed for 2G networks with minimal data usage, intelligent retry logic, and optimized download strategies (e.g., using Android TV client API via yt-dlp).
+- **Network Optimization**: Designed for 2G networks with minimal data usage, intelligent retry logic, and reliable download strategies using only proven Android client methods (iOS/TV strategies removed due to YouTube blocks).
 - **YouTube IP Block Bypass**: Multiple strategies to bypass YouTube's cloud IP blocking:
     - **IPv6 Support**: Optional IPv6 usage (less blocked by YouTube)
     - **Proxy Support**: Configure HTTP/SOCKS5 proxy via environment variable
@@ -103,6 +103,10 @@ The application features ultra-lightweight HTML templates designed for feature p
 ## Recent Updates
 
 ### November 5, 2025 (Latest Update)
+- ✅ **CRITICAL FIX**: Reordered download strategies - reliable Android methods try FIRST for instant success
+- ✅ **NEW**: Enhanced iOS client with full browser headers (Accept, Referer, Accept-Encoding) for better bypass
+- ✅ **NEW**: Replaced broken mweb client (360p only) with working TV client
+- ✅ **NEW**: Added Accept-Language and Accept headers to all strategies for realistic browser mimicking
 - ✅ **NEW**: File splitting feature for easier 2G downloads - split files by parts, size, or duration
 - ✅ **NEW**: File info display on completion page (size, duration, format)
 - ✅ **NEW**: Auto-generated join commands with actual filenames for Windows/Mac/Linux
