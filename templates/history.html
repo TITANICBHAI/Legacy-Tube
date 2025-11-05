@@ -3,16 +3,16 @@
 {% block title %}Download History - YouTube to 3GP{% endblock %}
 
 {% block content %}
-<h1>📋 Download History</h1>
+<h1>Download History</h1>
 
 <div class="info">
   <strong>Your Recent Conversions</strong><br>
-  Showing files from the last 48 hours. Files are kept for {{ 6 }} hours after conversion.
+  Showing files from the last 48 hours. Files are kept for 6 hours after conversion.
 </div>
 
 <p class="center">
-  <a href="/" class="button" style="display: inline-block; width: auto; padding: 8px 15px; margin: 5px;">🏠 Back to Home</a>
-  <a href="/search" class="button" style="display: inline-block; width: auto; padding: 8px 15px; margin: 5px;">🔍 Search YouTube</a>
+  <a href="/" class="button" style="display: inline-block; width: auto; padding: 8px 15px; margin: 5px;">[Home]</a>
+  <a href="/search" class="button" style="display: inline-block; width: auto; padding: 8px 15px; margin: 5px;">[Search]</a>
 </p>
 
 <hr>
@@ -28,15 +28,15 @@
     
     <strong>Status:</strong> 
     {% if item.status == 'completed' %}
-      ✅ Completed
+      [OK] Completed
     {% elif item.status == 'downloading' %}
-      ⬇️ Downloading...
+      [...] Downloading...
     {% elif item.status == 'converting' %}
-      🔄 Converting...
+      [...] Converting...
     {% elif item.status == 'failed' %}
-      ❌ Failed
+      [X] Failed
     {% else %}
-      ⏳ {{ item.status }}
+      [...] {{ item.status }}
     {% endif %}
     <br>
     
@@ -53,27 +53,27 @@
         {% if hours > 0 %}{{ hours }}h {% endif %}{{ minutes }}m
         <br>
       {% else %}
-        <strong>Status:</strong> ⚠️ Expired<br>
+        <strong>Status:</strong> [!] Expired<br>
       {% endif %}
     {% endif %}
     
     <div style="margin-top: 10px;">
       {% if item.status == 'completed' and item.file_exists %}
-        <a href="/download/{{ item.file_id }}" class="button" style="background: #4a904a; margin-bottom: 5px;">⬇️ Download {{ item.format }}</a>
-        <a href="/status/{{ item.file_id }}" class="button" style="background: #4a90a4; margin-bottom: 5px;">📊 View Details / Split File</a>
+        <a href="/download/{{ item.file_id }}" class="button" style="background: #4a904a; margin-bottom: 5px;">>> Download {{ item.format }}</a>
+        <a href="/status/{{ item.file_id }}" class="button" style="background: #4a90a4; margin-bottom: 5px;">[>] View Details / Split File</a>
       {% elif item.status in ['downloading', 'converting'] %}
-        <a href="/status/{{ item.file_id }}" class="button" style="background: #d4a017;">🔄 Check Progress</a>
+        <a href="/status/{{ item.file_id }}" class="button" style="background: #d4a017;">[>] Check Progress</a>
       {% elif item.status == 'failed' %}
-        <a href="{{ item.url }}" class="button" style="background: #a44a4a;">🔄 Try Again (Copy URL)</a>
+        <a href="{{ item.url }}" class="button" style="background: #a44a4a;">[>] Try Again (Copy URL)</a>
       {% else %}
-        <a href="/status/{{ item.file_id }}" class="button">📊 View Status</a>
+        <a href="/status/{{ item.file_id }}" class="button">[>] View Status</a>
       {% endif %}
     </div>
   </div>
   {% endfor %}
 {% else %}
   <div class="info">
-    <p class="center">📭 <strong>No recent conversions</strong></p>
+    <p class="center"><strong>No recent conversions</strong></p>
     <p class="center">Your conversion history will appear here.</p>
     <p class="center"><a href="/">Convert a video</a> or <a href="/search">search YouTube</a> to get started!</p>
   </div>
@@ -82,7 +82,7 @@
 <hr>
 
 <p class="center" style="font-size: 12px; color: #666;">
-  💡 <strong>Tip:</strong> Files are automatically deleted {{ 6 }} hours after conversion to save space.<br>
+  [!] <strong>Tip:</strong> Files are automatically deleted 6 hours after conversion to save space.<br>
   Download your files before they expire!
 </p>
 

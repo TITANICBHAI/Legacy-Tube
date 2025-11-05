@@ -802,7 +802,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 'progress': f'Converting to MP3 audio ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
             })
 
-            # MP3 conversion with quality preset
+            # MP3 conversion with quality preset and ENHANCED compression
             # All presets use stereo (2 channels) as described in the preset descriptions
             convert_cmd = [
                 FFMPEG_PATH,
@@ -813,7 +813,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-b:a', quality_preset['bitrate'],  # Bitrate from preset
                 '-ac', '2',  # Stereo for all presets (matches preset descriptions)
                 '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
-                '-compression_level', '2',  # Faster encoding for web server
+                '-compression_level', '9',  # Maximum compression (smaller files, slightly slower)
+                '-joint_stereo', '1',  # Better stereo compression (5-10% smaller)
                 '-threads', '1',
                 '-y',
                 output_path
@@ -824,10 +825,12 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 'progress': f'Converting to 3GP video ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
             })
 
-            # 3GP video conversion with quality preset and compression
+            # 3GP video conversion with quality preset and ENHANCED compression
             video_bitrate_num = int(quality_preset['video_bitrate'].replace('k', ''))
             maxrate = f"{int(video_bitrate_num * 1.25)}k"  # 25% higher maxrate for better quality
             bufsize = f"{int(video_bitrate_num * 2)}k"  # Buffer size for smooth streaming
+            fps_num = int(quality_preset['fps'])
+            gop_size = fps_num * 10  # GOP every 10 seconds for better compression
 
             convert_cmd = [
                 FFMPEG_PATH,
@@ -837,10 +840,16 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-r', quality_preset['fps'],  # FPS from preset
                 '-b:v', quality_preset['video_bitrate'],  # Video bitrate from preset
                 '-maxrate', maxrate,  # Dynamic maxrate based on bitrate
-                '-bufsize', bufsize,  # Dynamic buffer size
+                '-bufsize', bufsize,  # Buffer size for smooth streaming
                 '-qmin', '2',  # Minimum quantizer for better quality
                 '-qmax', '31',  # Maximum quantizer
                 '-mbd', 'rd',  # Rate distortion optimization for better compression
+                '-flags', '+cgop',  # Closed GOP for better compression
+                '-g', str(gop_size),  # GOP size for efficient keyframe placement
+                '-trellis', '2',  # Trellis quantization for 10-15% smaller files
+                '-cmp', '2',  # Use hadamard comparison (better compression)
+                '-subcmp', '2',  # Subpixel comparison for better quality
+                '-me_method', 'hex',  # Fast motion estimation with good quality
                 '-acodec', 'aac',
                 '-ar', quality_preset['audio_sample_rate'],  # Audio sample rate from preset
                 '-b:a', quality_preset['audio_bitrate'],  # Audio bitrate from preset
