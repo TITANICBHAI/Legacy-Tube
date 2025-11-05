@@ -97,13 +97,12 @@
 </div>
 
 {% if not has_cookies %}
-<div class="error">
-<p class="center"><strong>Notice:</strong></p>
-<p>YouTube may block downloads. If errors occur, <a href="/cookies" style="color: #a44a4a; text-decoration: underline;">upload cookies here</a>.</p>
+<div class="info">
+<p class="center" style="font-size: 12px; color: #666;">Server uses 7 download methods to work without cookies. If downloads fail repeatedly, <a href="/cookies" style="color: #4a904a; text-decoration: underline;">cookies can help</a>.</p>
 </div>
 {% else %}
 <div class="success">
-<p class="center">&#x2713; Cookies configured</p>
+<p class="center">&#x2713; Cookies configured - enhanced reliability</p>
 </div>
 {% endif %}
 {% endblock %}

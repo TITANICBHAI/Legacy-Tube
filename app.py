@@ -452,14 +452,15 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             'outtmpl': temp_video,
             'max_filesize': MAX_FILESIZE,
             'nocheckcertificate': True,
-            'retries': 15,
-            'retry_sleep': 3,
-            'fragment_retries': 15,
-            'sleep_requests': 1,
-            'concurrent_fragment_downloads': 1,
+            'retries': 10,  # Reduced since we try 7 different strategies
+            'fragment_retries': 10,
+            'sleep_requests': 2,  # Longer delay between requests to avoid bot detection
+            'sleep_interval': 3,  # Additional sleep interval
+            'max_sleep_interval': 10,  # Max random sleep to appear more human
+            'concurrent_fragment_downloads': 1,  # Sequential to avoid rate limits
             'ignoreerrors': False,
-            'extractor_retries': 10,
-            'socket_timeout': 30,
+            'extractor_retries': 8,
+            'socket_timeout': 45,  # Longer timeout for slow cloud connections
             'http_chunk_size': 10485760,  # 10MB
             'quiet': False,
             'no_warnings': False,
@@ -483,12 +484,12 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             base_opts['ratelimit'] = RATE_LIMIT_BYTES
             logger.info(f"Rate limiting enabled: {RATE_LIMIT_BYTES} bytes/sec ({RATE_LIMIT_BYTES/1024:.0f} KB/s)")
 
-        # Download strategies - RELIABLE METHODS FIRST (Nov 2025)
-        # Android and Android Music work best - try these FIRST for fast success
-        # Improved fallbacks with better headers and TV client instead of broken mweb
+        # Download strategies - OPTIMIZED FOR COOKIE-LESS CLOUD HOSTING (Nov 2025)
+        # Multiple strategies to bypass YouTube's bot detection without requiring cookies
+        # Order: Mobile clients (least blocked) -> TV clients -> Web clients (fallback)
         strategies = [
             {
-                'name': 'Android Client (Most Reliable)',
+                'name': 'Android Client (Primary)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android'],
@@ -504,7 +505,25 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             },
             {
-                'name': 'Android Music (Reliable)',
+                'name': 'Android Embedded (Cloud-Optimized)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['android_embedded'],
+                        'player_skip': ['configs', 'webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'com.google.android.youtube/19.45.38 (Linux; U; Android 14; en_US)',
+                        'X-YouTube-Client-Name': '55',
+                        'X-YouTube-Client-Version': '19.45.38',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept': '*/*',
+                        'Origin': 'https://www.youtube.com',
+                        'Referer': 'https://www.youtube.com/'
+                    }
+                }
+            },
+            {
+                'name': 'Android Music (Audio Optimized)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['android_music'],
@@ -520,7 +539,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             },
             {
-                'name': 'iOS Client (Enhanced)',
+                'name': 'iOS Client (Alternative)',
                 'opts': {
                     'extractor_args': {'youtube': {
                         'player_client': ['ios'],
@@ -538,14 +557,50 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 }
             },
             {
-                'name': 'TV Client (Alternative)',
+                'name': 'TV Embedded (Less Restricted)',
                 'opts': {
                     'extractor_args': {'youtube': {
-                        'player_client': ['tv'],
+                        'player_client': ['tv_embedded'],
+                        'player_skip': ['configs', 'webpage']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.31 TV Safari/537.36',
+                        'Accept': '*/*',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Origin': 'https://www.youtube.com',
+                        'Referer': 'https://www.youtube.com/'
+                    }
+                }
+            },
+            {
+                'name': 'Web Embedded (Fallback)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['web_embedded'],
+                        'player_skip': ['configs']
+                    }},
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Origin': 'https://www.youtube.com',
+                        'Referer': 'https://www.youtube.com/',
+                        'Sec-Fetch-Dest': 'iframe',
+                        'Sec-Fetch-Mode': 'navigate',
+                        'Sec-Fetch-Site': 'cross-site'
+                    }
+                }
+            },
+            {
+                'name': 'Media Connect (Alternative)',
+                'opts': {
+                    'extractor_args': {'youtube': {
+                        'player_client': ['mediaconnect'],
                         'player_skip': ['webpage']
                     }},
                     'http_headers': {
-                        'User-Agent': 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
+                        'User-Agent': 'com.google.android.apps.youtube.music/7.31.51 (Linux; U; Android 14)',
                         'Accept': '*/*',
                         'Accept-Language': 'en-US,en;q=0.9'
                     }
@@ -563,14 +618,31 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
         # Custom user agent support
         custom_ua = os.environ.get('CUSTOM_USER_AGENT', '')
 
+        # Multi-level retry strategy for cookie-less cloud hosting:
+        # 1. yt-dlp retries each strategy 10 times with internal backoff (sleep_interval 3-10s)
+        # 2. Our code tries 7 different strategies with exponential delays between them
+        # 3. Total: up to 70 attempts (10 retries × 7 strategies) with smart backoff
         for i, strategy in enumerate(strategies):
             try:
                 if i > 0:
-                    # Exponential backoff: 1s, 3s, 9s delays (then cap at 9s for further retries)
-                    delay = min(9, 3 ** (i - 1))
+                    # Exponential backoff between strategies: 2s, 4s, 8s, 12s, 15s, 20s
+                    # This prevents rate limiting when switching download methods
+                    if i == 1:
+                        delay = 2
+                    elif i == 2:
+                        delay = 4
+                    elif i == 3:
+                        delay = 8
+                    elif i == 4:
+                        delay = 12
+                    elif i == 5:
+                        delay = 15
+                    else:
+                        delay = 20
+                    
                     update_status(file_id, {
                         'status': 'downloading',
-                        'progress': f'Retrying with {strategy["name"]} client... (attempt {i+1}/{len(strategies)}, waiting {delay}s)'
+                        'progress': f'Retrying with {strategy["name"]} client... (attempt {i+1}/{len(strategies)}, waiting {delay}s to avoid rate limits)'
                     })
                     time.sleep(delay)
 
@@ -660,48 +732,48 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             error_msg = last_error if last_error else "All download strategies failed"
             error_lower = error_msg.lower()
 
-            # Check if cookies would help
-            cookies_help = " → Try uploading YouTube cookies from /cookies page to fix this." if not has_cookies() else ""
+            # Optional cookie suggestion (only for specific errors where cookies definitely help)
+            cookies_help = " (Optional: Upload cookies from /cookies page if this persists)" if not has_cookies() else ""
 
-            # Enhanced error detection with cookie suggestions
+            # Enhanced error detection with better messages
             if '403' in error_msg or 'forbidden' in error_lower:
-                raise Exception(f"⚠️ YouTube IP BLOCK detected! YouTube is blocking downloads from this server.{cookies_help if cookies_help else ' Try using fresh cookies from /cookies page.'}")
+                raise Exception(f"⚠️ YouTube blocked this request. Tried 7 different download methods. Wait 10-15 minutes before retrying.{cookies_help}")
 
             if 'po token' in error_lower or 'po_token' in error_lower:
-                raise Exception(f"⚠️ YouTube now requires PO tokens for some videos. Upload YouTube cookies from /cookies page to bypass this restriction.")
+                raise Exception(f"⚠️ YouTube requires PO tokens for this video. Upload cookies from /cookies page to access it.")
 
             if 'failed to extract' in error_lower or 'failed to parse' in error_lower:
-                raise Exception(f"⚠️ YouTube blocked the video extraction. This is a bot detection measure.{cookies_help}")
+                raise Exception(f"⚠️ Could not extract video information. This video may have restrictions. Try again in a few minutes.{cookies_help}")
 
             if 'video player configuration error' in error_lower or 'error 153' in error_lower:
-                raise Exception(f"⚠️ YouTube player error (Error 153). This video has restricted playback.{cookies_help}")
+                raise Exception(f"⚠️ Video player error (Error 153). This video has playback restrictions.{cookies_help}")
 
             if 'bot' in error_lower and ('sign in' in error_lower or 'confirm' in error_lower):
-                raise Exception(f"⚠️ YouTube bot detection triggered!{cookies_help if cookies_help else ' Try fresh cookies from /cookies page.'}")
+                raise Exception(f"⚠️ YouTube bot detection activated. Wait 10-15 minutes before trying again.{cookies_help}")
 
             if 'duration' in error_lower:
                 raise Exception(f"Video exceeds {MAX_VIDEO_DURATION/3600:.0f}-hour limit")
             if 'filesize' in error_msg.lower() or 'too large' in error_msg.lower():
-                raise Exception(f"Video file too large (limit: 2GB)")
+                raise Exception(f"Video file too large (server limit: 500MB)")
             if '429' in error_msg or 'too many requests' in error_msg.lower():
-                raise Exception(f"YouTube rate limit reached. Wait 5-10 minutes and try again.{cookies_help}")
+                raise Exception(f"YouTube rate limit reached. Wait 10-15 minutes and try again. Server tried multiple download methods.")
             if 'age' in error_msg.lower() and 'restricted' in error_msg.lower():
                 raise Exception(f"Video is age-restricted. Upload cookies from /cookies page to access it.")
             if 'private' in error_msg.lower() or 'members-only' in error_msg.lower():
                 raise Exception("Video is private or members-only. Cannot download.")
             if 'geo' in error_msg.lower() or 'not available in your country' in error_msg.lower():
-                raise Exception("Video is geo-restricted and not available in your region.")
+                raise Exception("Video is geo-restricted and not available in this region.")
             if 'copyright' in error_msg.lower() or 'removed' in error_msg.lower():
-                raise Exception("Video removed due to copyright claim or deletion.")
+                raise Exception("Video removed due to copyright or deletion.")
             if 'live' in error_msg.lower() and 'stream' in error_msg.lower():
                 raise Exception("Cannot download live streams. Try again after the stream ends.")
             if 'sign in' in error_msg.lower() or 'login' in error_msg.lower():
                 if has_cookies():
                     raise Exception("YouTube authentication failed. Upload fresh cookies from /cookies page.")
                 else:
-                    raise Exception(f"YouTube requires sign-in verification.{cookies_help}")
+                    raise Exception(f"YouTube requires sign-in for this video. Upload cookies from /cookies page to access it.")
 
-            raise Exception(f"Download failed: {error_msg[:200]}{cookies_help}")
+            raise Exception(f"Download failed after trying 7 different methods: {error_msg[:150]}. Wait 10-15 minutes before retrying.")
 
         if not os.path.exists(temp_video):
             raise Exception("Download failed: Video file not created")

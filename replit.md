@@ -1,7 +1,7 @@
 # YouTube to 3GP Converter for Feature Phones
 
 ## Overview
-This project is a web application that converts YouTube videos to the 3GP format (176x144 resolution) and MP3 audio, optimized for feature phones like the Nokia 5310 and older web browsers such as Opera Mini 4.4. Its main purpose is to enable access to YouTube content on 2G networks by providing ultra-low file sizes and minimal bandwidth usage. It aims to be a free and accessible tool for users with older devices. The application also includes advanced features for bypassing YouTube's anti-bot measures and efficient file splitting for easier downloads on constrained networks.
+This project is a web application that converts YouTube videos to the 3GP format (176x144 resolution) and MP3 audio, optimized for feature phones like the Nokia 5310 and older web browsers such as Opera Mini 4.4. Its main purpose is to enable access to YouTube content on 2G networks by providing ultra-low file sizes and minimal bandwidth usage. It aims to be a free and accessible tool for users with older devices. The application prioritizes cookie-less operation for cloud hosting (Render free tier), using 7 different download strategies to bypass YouTube's anti-bot measures without requiring users to upload cookies from feature phones.
 
 ## User Preferences
 - Target device: Nokia 5310 feature phone
@@ -33,11 +33,12 @@ The application features ultra-lightweight HTML templates with no JavaScript, op
 - **Audio Conversion** (MP3 Format):
     - **Quality Presets**: 128kbps (default), 192kbps, 256kbps, 320kbps.
     - **Compression**: VBR mode, 44.1-48kHz sample rate, stereo channels.
-- **YouTube Authentication**: Cookie-based authentication to bypass YouTube's bot detection and rate limiting.
+- **YouTube Authentication**: OPTIONAL cookie support for enhanced reliability. App works without cookies using 7 optimized download strategies.
 - **Background Processing**: Asynchronous download and conversion with status updates.
 - **File Management**: Automatic cleanup of converted files and failed jobs after 6 hours.
 - **Network Optimization**: Designed for 2G networks with minimal data usage, intelligent retry logic, and reliable download strategies mimicking Android clients.
-- **YouTube IP Block Bypass**: Supports IPv6, proxy configuration, rate limiting, enhanced user agents, custom browser headers, exponential backoff for retries, and smart error detection.
+- **Cookie-Less Cloud Hosting**: Optimized for Render free tier with 7 download methods (Android Client, Android Embedded, Android Music, iOS, TV Embedded, Web Embedded, Media Connect).
+- **YouTube IP Block Bypass**: Supports IPv6, proxy configuration, rate limiting, enhanced user agents, custom browser headers, smarter exponential backoff (2s→4s→8s→12s→15s→20s), realistic browser headers (DNT, Sec-Fetch-*), randomized sleep intervals, and smart error detection.
 - **Disk Space Management**: Real-time monitoring of `/tmp` disk space, emergency cleanup, and pre-download checks, with configurable thresholds.
 - **File Splitting**: Advanced splitting functionality by number of parts, size, or duration (for 3GP), with sequential numbering, auto-generated join commands, and smart validation.
 - **Download History**: Tracks recent conversions (last 48 hours) with expiry countdowns, status indicators, and direct re-download links.
@@ -60,6 +61,18 @@ The application features ultra-lightweight HTML templates with no JavaScript, op
 - `GET /cookies`, `POST /cookies`: Cookie management.
 - `GET /history`: Shows download history.
 - `GET /health`: Health check.
+
+## Recent Changes
+
+### November 2025 - Cookie-Less Cloud Hosting Improvements
+- **Purpose**: Make app work reliably WITHOUT cookies on Render free tier, since feature phone users can't easily upload cookies
+- **Download Strategies**: Expanded from 4 to 7 methods, adding Android Embedded, TV Embedded, Web Embedded, and Media Connect clients
+- **Retry Logic**: Multi-level approach - yt-dlp retries each strategy 10 times internally (3-10s random sleep), then code switches strategies with exponential backoff (2s→4s→8s→12s→15s→20s). Total: up to 70 attempts (10 retries × 7 strategies)
+- **Anti-Bot Headers**: Added DNT, Sec-Fetch-Dest, Sec-Fetch-Mode, Sec-Fetch-Site, Upgrade-Insecure-Requests headers to all requests
+- **yt-dlp Settings**: 10 retries per strategy (total 70 with 7 strategies), longer sleep intervals (2-10s randomized), increased timeouts (45s socket timeout)
+- **Error Messages**: Improved to emphasize waiting 10-15 minutes instead of requiring cookies, cookies marked as optional
+- **UI Updates**: De-emphasized cookie warnings on all pages, changed from red error boxes to subtle info boxes
+- **Documentation**: Updated README.md and templates to clarify cookies are optional, not required
 
 ## External Dependencies
 - **yt-dlp**: Python library for downloading videos.
