@@ -1185,9 +1185,8 @@ def split_video_by_duration(file_path, duration_seconds, file_id):
     total_duration = info['duration_seconds']
     
     if total_duration == 0:
+        logger.warning(f"Could not get duration for video split: {file_path}")
         return None
-    
-    ffmpeg_path = get_ffmpeg_path()
     
     while start_time < total_duration:
         part_filename = f"{file_id}_part{part_num}{ext}"
@@ -1195,7 +1194,7 @@ def split_video_by_duration(file_path, duration_seconds, file_id):
         
         # Use ffmpeg to extract segment
         ffmpeg_cmd = [
-            ffmpeg_path,
+            FFMPEG_PATH,
             '-i', file_path,
             '-ss', str(start_time),
             '-t', str(duration_seconds),

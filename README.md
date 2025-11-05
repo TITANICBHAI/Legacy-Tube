@@ -11,7 +11,7 @@ Convert YouTube videos to 3GP format optimized for feature phones like Nokia 531
 ### Core Features
 - **Quality Options** - Choose from 4 MP3 qualities (128k-320k) and 4 video qualities
 - **Smart Compression** - Advanced FFmpeg settings for better quality at smaller sizes
-- **Reliable Downloads** - Uses proven Android client methods (iOS/TV methods removed due to YouTube blocks)
+- **Reliable Downloads** - Optimized strategy order prioritizes working Android methods first
 - **No JavaScript** - Works on Opera Mini 4.4 and older browsers
 - **Ultra-Low Bitrate** - Optimized for 2G networks (176x144 resolution)
 - **Long Videos** - Supports up to 6 hours of video

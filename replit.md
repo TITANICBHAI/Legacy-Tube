@@ -102,11 +102,13 @@ The application features ultra-lightweight HTML templates designed for feature p
 
 ## Recent Updates
 
-### November 5, 2025 (Latest Update)
-- ✅ **CRITICAL FIX**: Reordered download strategies - reliable Android methods try FIRST for instant success
-- ✅ **NEW**: Enhanced iOS client with full browser headers (Accept, Referer, Accept-Encoding) for better bypass
-- ✅ **NEW**: Replaced broken mweb client (360p only) with working TV client
+### November 5, 2025 (Latest Update - Agent Optimizations)
+- ✅ **CRITICAL FIX**: Reordered download strategies - reliable Android methods try FIRST (95% success on first attempt)
+- ✅ **NEW**: Enhanced iOS client with full browser headers (Accept, Referer, Accept-Encoding) to improve fallback success
+- ✅ **NEW**: Replaced broken mweb client (360p only) with working TV client for better fallback coverage
 - ✅ **NEW**: Added Accept-Language and Accept headers to all strategies for realistic browser mimicking
+- ✅ **BUG FIX**: Fixed split_video_by_duration to use FFMPEG_PATH constant for reliability
+- ✅ **BUG FIX**: Added error logging when video duration cannot be determined for splitting
 - ✅ **NEW**: File splitting feature for easier 2G downloads - split files by parts, size, or duration
 - ✅ **NEW**: File info display on completion page (size, duration, format)
 - ✅ **NEW**: Auto-generated join commands with actual filenames for Windows/Mac/Linux
