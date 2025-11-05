@@ -1020,7 +1020,19 @@ def convert():
 def status(file_id):
     status_data = get_status()
     file_status = status_data.get(file_id, {'status': 'unknown', 'progress': 'File not found'})
-    return render_template('status.html', file_id=file_id, file_status=file_status)
+    
+    # Get file info if file exists
+    file_info = None
+    if file_status.get('status') == 'completed':
+        file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+        file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
+        
+        if os.path.exists(file_path_3gp):
+            file_info = get_file_info(file_path_3gp)
+        elif os.path.exists(file_path_mp3):
+            file_info = get_file_info(file_path_mp3)
+    
+    return render_template('status.html', file_id=file_id, file_status=file_status, file_info=file_info)
 
 @app.route('/download/<file_id>')
 def download(file_id):
@@ -1034,6 +1046,324 @@ def download(file_id):
         return send_file(file_path_mp3, as_attachment=True, download_name=f'audio_{file_id}.mp3')
     else:
         flash('File not found or has been deleted')
+        return redirect(url_for('index'))
+
+def get_file_info(file_path):
+    """Get file information: size, duration (for video/audio), format"""
+    info = {
+        'size_bytes': 0,
+        'size_mb': 0,
+        'size_human': '0 MB',
+        'duration_seconds': 0,
+        'duration_human': 'Unknown',
+        'format': os.path.splitext(file_path)[1].replace('.', '').upper()
+    }
+    
+    if not os.path.exists(file_path):
+        return info
+    
+    # Get file size
+    size_bytes = os.path.getsize(file_path)
+    info['size_bytes'] = size_bytes
+    info['size_mb'] = size_bytes / (1024 * 1024)
+    
+    # Human readable size
+    if size_bytes >= 1024 * 1024:
+        info['size_human'] = f"{size_bytes / (1024 * 1024):.2f} MB"
+    else:
+        info['size_human'] = f"{size_bytes / 1024:.2f} KB"
+    
+    # Get duration using ffprobe (for video/audio files)
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in ['.3gp', '.mp3', '.mp4', '.avi', '.mkv', '.flv']:
+        try:
+            ffprobe_cmd = [
+                get_ffprobe_path(),
+                '-v', 'quiet',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                file_path
+            ]
+            result = subprocess.run(ffprobe_cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout.strip():
+                duration_seconds = float(result.stdout.strip())
+                info['duration_seconds'] = int(duration_seconds)
+                
+                # Human readable duration
+                hours = int(duration_seconds // 3600)
+                minutes = int((duration_seconds % 3600) // 60)
+                seconds = int(duration_seconds % 60)
+                
+                if hours > 0:
+                    info['duration_human'] = f"{hours}h {minutes}m {seconds}s"
+                elif minutes > 0:
+                    info['duration_human'] = f"{minutes}m {seconds}s"
+                else:
+                    info['duration_human'] = f"{seconds}s"
+        except Exception as e:
+            logger.warning(f"Could not get duration for {file_path}: {str(e)}")
+    
+    return info
+
+def split_file_by_parts(file_path, num_parts, file_id):
+    """Split file into specified number of parts"""
+    if not os.path.exists(file_path):
+        return None
+    
+    file_size = os.path.getsize(file_path)
+    
+    # Validate: prevent zero-byte parts
+    if num_parts > file_size:
+        logger.warning(f"num_parts ({num_parts}) exceeds file size ({file_size} bytes), capping to file size")
+        num_parts = max(2, file_size)  # At least 2 parts, at most 1 byte per part
+    
+    part_size = file_size // num_parts
+    
+    # Additional safety: ensure part_size is at least 1 byte
+    if part_size < 1:
+        part_size = 1
+        num_parts = file_size
+    
+    ext = os.path.splitext(file_path)[1]
+    parts = []
+    
+    with open(file_path, 'rb') as f:
+        for i in range(num_parts):
+            part_filename = f"{file_id}_part{i+1}{ext}"
+            part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
+            
+            # Read the chunk for this part
+            if i == num_parts - 1:
+                # Last part gets all remaining bytes
+                chunk = f.read()
+            else:
+                chunk = f.read(part_size)
+            
+            # Skip empty chunks
+            if not chunk:
+                break
+            
+            with open(part_path, 'wb') as part_file:
+                part_file.write(chunk)
+            
+            parts.append({
+                'filename': part_filename,
+                'path': part_path,
+                'size': len(chunk),
+                'part_num': i + 1
+            })
+    
+    # Verify all parts are non-zero
+    valid_parts = []
+    for part in parts:
+        if part['size'] > 0:
+            valid_parts.append(part)
+        else:
+            # Clean up zero-byte file
+            if os.path.exists(part['path']):
+                os.remove(part['path'])
+            logger.warning(f"Removed zero-byte part: {part['filename']}")
+    
+    return valid_parts if len(valid_parts) > 0 else None
+
+def split_file_by_size(file_path, size_mb, file_id):
+    """Split file into parts of specified size (in MB)"""
+    if not os.path.exists(file_path):
+        return None
+    
+    file_size = os.path.getsize(file_path)
+    part_size = int(size_mb * 1024 * 1024)  # Convert MB to bytes
+    
+    ext = os.path.splitext(file_path)[1]
+    parts = []
+    part_num = 1
+    
+    with open(file_path, 'rb') as f:
+        while True:
+            chunk = f.read(part_size)
+            if not chunk:
+                break
+            
+            part_filename = f"{file_id}_part{part_num}{ext}"
+            part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
+            
+            with open(part_path, 'wb') as part_file:
+                part_file.write(chunk)
+            
+            parts.append({
+                'filename': part_filename,
+                'path': part_path,
+                'size': len(chunk),
+                'part_num': part_num
+            })
+            
+            part_num += 1
+    
+    return parts
+
+def split_video_by_duration(file_path, duration_seconds, file_id):
+    """Split video into parts of specified duration (in seconds) using ffmpeg"""
+    if not os.path.exists(file_path):
+        return None
+    
+    ext = os.path.splitext(file_path)[1]
+    parts = []
+    part_num = 1
+    start_time = 0
+    
+    # Get total duration
+    info = get_file_info(file_path)
+    total_duration = info['duration_seconds']
+    
+    if total_duration == 0:
+        return None
+    
+    ffmpeg_path = get_ffmpeg_path()
+    
+    while start_time < total_duration:
+        part_filename = f"{file_id}_part{part_num}{ext}"
+        part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
+        
+        # Use ffmpeg to extract segment
+        ffmpeg_cmd = [
+            ffmpeg_path,
+            '-i', file_path,
+            '-ss', str(start_time),
+            '-t', str(duration_seconds),
+            '-c', 'copy',  # Copy without re-encoding for speed
+            '-y',  # Overwrite output file
+            part_path
+        ]
+        
+        try:
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
+            if result.returncode == 0 and os.path.exists(part_path):
+                parts.append({
+                    'filename': part_filename,
+                    'path': part_path,
+                    'size': os.path.getsize(part_path),
+                    'part_num': part_num
+                })
+            else:
+                logger.error(f"Failed to create part {part_num}: {result.stderr}")
+                break
+        except Exception as e:
+            logger.error(f"Error splitting video part {part_num}: {str(e)}")
+            break
+        
+        start_time += duration_seconds
+        part_num += 1
+    
+    return parts if len(parts) > 0 else None
+
+@app.route('/split/<file_id>', methods=['POST'])
+def split_file(file_id):
+    """Handle file splitting requests"""
+    # Find the file
+    file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+    file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
+    
+    file_path = None
+    if os.path.exists(file_path_3gp):
+        file_path = file_path_3gp
+    elif os.path.exists(file_path_mp3):
+        file_path = file_path_mp3
+    else:
+        flash('File not found or has been deleted')
+        return redirect(url_for('status', file_id=file_id))
+    
+    # Get split parameters
+    split_mode = request.form.get('split_mode')  # 'parts', 'size', or 'duration'
+    
+    parts = None
+    
+    try:
+        if split_mode == 'parts':
+            num_parts = int(request.form.get('num_parts', 2))
+            file_size = os.path.getsize(file_path)
+            
+            # Validate range
+            if num_parts < 2 or num_parts > 100:
+                flash('Number of parts must be between 2 and 100')
+                return redirect(url_for('status', file_id=file_id))
+            
+            # Validate against file size
+            if num_parts > file_size:
+                max_parts = max(2, file_size)
+                flash(f'File is too small to split into {num_parts} parts. Maximum {max_parts} parts for this file. Try splitting by size instead.')
+                return redirect(url_for('status', file_id=file_id))
+            
+            parts = split_file_by_parts(file_path, num_parts, file_id)
+            
+        elif split_mode == 'size':
+            size_mb = float(request.form.get('size_mb', 5))
+            if size_mb < 0.1 or size_mb > 1000:
+                flash('Part size must be between 0.1 MB and 1000 MB')
+                return redirect(url_for('status', file_id=file_id))
+            parts = split_file_by_size(file_path, size_mb, file_id)
+            
+        elif split_mode == 'duration':
+            duration_minutes = float(request.form.get('duration_minutes', 2))
+            duration_seconds = int(duration_minutes * 60)
+            if duration_seconds < 10 or duration_seconds > 36000:
+                flash('Part duration must be between 10 seconds and 10 hours')
+                return redirect(url_for('status', file_id=file_id))
+            parts = split_video_by_duration(file_path, duration_seconds, file_id)
+        
+        if parts:
+            flash(f'File split into {len(parts)} parts successfully!')
+            return redirect(url_for('split_downloads', file_id=file_id))
+        else:
+            flash('Failed to split file. Please try again.')
+            return redirect(url_for('status', file_id=file_id))
+            
+    except ValueError as e:
+        flash('Invalid input values. Please check your numbers.')
+        return redirect(url_for('status', file_id=file_id))
+    except Exception as e:
+        logger.error(f"Error splitting file: {str(e)}")
+        flash('An error occurred while splitting the file.')
+        return redirect(url_for('status', file_id=file_id))
+
+@app.route('/split_downloads/<file_id>')
+def split_downloads(file_id):
+    """Show download links for all split parts"""
+    # Find all parts for this file_id
+    parts = []
+    for filename in os.listdir(DOWNLOAD_FOLDER):
+        if filename.startswith(f'{file_id}_part'):
+            part_path = os.path.join(DOWNLOAD_FOLDER, filename)
+            # Extract part number
+            import re
+            match = re.search(r'part(\d+)', filename)
+            part_num = int(match.group(1)) if match else 0
+            
+            parts.append({
+                'filename': filename,
+                'path': part_path,
+                'size': os.path.getsize(part_path),
+                'size_human': f"{os.path.getsize(part_path) / (1024 * 1024):.2f} MB",
+                'part_num': part_num
+            })
+    
+    # Sort by part number
+    parts.sort(key=lambda x: x['part_num'])
+    
+    if not parts:
+        flash('No split parts found. File may have expired.')
+        return redirect(url_for('index'))
+    
+    return render_template('split_downloads.html', file_id=file_id, parts=parts)
+
+@app.route('/download_part/<filename>')
+def download_part(filename):
+    """Download a specific split part"""
+    file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+    
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True, download_name=filename)
+    else:
+        flash('File part not found or has been deleted')
         return redirect(url_for('index'))
 
 @app.route('/search', methods=['GET', 'POST'])

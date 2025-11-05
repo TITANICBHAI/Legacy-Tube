@@ -45,15 +45,93 @@
 <p>{{ file_status.progress }}</p>
 </div>
 
-<a href="/download/{{ file_id }}" class="button" style="background: #4a904a; font-size: 16px; padding: 15px;">&#x2B07; DOWNLOAD NOW</a>
+{% if file_info %}
+<div class="info" style="background: #e8f4f8; border-color: #4a90a4;">
+<p class="center"><strong>&#x1F4CA; FILE INFO</strong></p>
+<ul style="list-style: none; padding: 0;">
+<li><strong>Size:</strong> {{ file_info.size_human }}</li>
+<li><strong>Duration:</strong> {{ file_info.duration_human }}</li>
+<li><strong>Format:</strong> {{ file_info.format }}</li>
+</ul>
+</div>
+{% endif %}
+
+<a href="/download/{{ file_id }}" class="button" style="background: #4a904a; font-size: 18px; padding: 15px; margin-bottom: 10px;">&#x2B07; DOWNLOAD FULL FILE</a>
+
+<div class="info" style="background: #fff9e6; border-color: #d4a017;">
+<p class="center"><strong>&#x2702; SPLIT FILE FOR EASIER DOWNLOAD</strong></p>
+<p class="center" style="font-size: 14px;">Split large files into smaller parts - perfect for 2G networks!</p>
+
+<form method="POST" action="/split/{{ file_id }}" style="margin-top: 15px;">
+<fieldset style="border: 2px solid #d4a017; padding: 10px; margin-bottom: 10px;">
+<legend style="font-weight: bold; padding: 0 5px;">Split Method:</legend>
+
+<label style="display: block; margin: 10px 0; font-size: 16px;">
+<input type="radio" name="split_mode" value="parts" checked onclick="document.getElementById('parts_input').style.display='block'; document.getElementById('size_input').style.display='none'; document.getElementById('duration_input').style.display='none';">
+<strong>By Number of Parts</strong>
+</label>
+<div id="parts_input" style="margin-left: 20px; margin-bottom: 10px;">
+<label style="font-size: 14px;">
+Number of parts (2-100):
+<input type="number" name="num_parts" value="5" min="2" max="100" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
+</label>
+{% if file_info %}
+<p style="font-size: 12px; color: #666; margin-top: 5px;">
+Split {{ file_info.size_human }} into equal parts
+</p>
+{% endif %}
+</div>
+
+<label style="display: block; margin: 10px 0; font-size: 16px;">
+<input type="radio" name="split_mode" value="size" onclick="document.getElementById('parts_input').style.display='none'; document.getElementById('size_input').style.display='block'; document.getElementById('duration_input').style.display='none';">
+<strong>By Part Size (MB)</strong>
+</label>
+<div id="size_input" style="display: none; margin-left: 20px; margin-bottom: 10px;">
+<label style="font-size: 14px;">
+Size per part in MB:
+<input type="number" name="size_mb" value="2" min="0.1" max="1000" step="0.1" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
+</label>
+{% if file_info %}
+<p style="font-size: 12px; color: #666; margin-top: 5px;">
+{{ file_info.size_human }} ≈ {{ (file_info.size_mb / 2)|round(0, 'ceil')|int }} parts at 2MB each
+</p>
+{% endif %}
+</div>
+
+{% if file_info and file_info.format == '3GP' and file_info.duration_seconds > 0 %}
+<label style="display: block; margin: 10px 0; font-size: 16px;">
+<input type="radio" name="split_mode" value="duration" onclick="document.getElementById('parts_input').style.display='none'; document.getElementById('size_input').style.display='none'; document.getElementById('duration_input').style.display='block';">
+<strong>By Duration (Minutes)</strong>
+</label>
+<div id="duration_input" style="display: none; margin-left: 20px; margin-bottom: 10px;">
+<label style="font-size: 14px;">
+Minutes per part:
+<input type="number" name="duration_minutes" value="2" min="0.17" max="600" step="0.5" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
+</label>
+<p style="font-size: 12px; color: #666; margin-top: 5px;">
+{{ file_info.duration_human }} ≈ {{ (file_info.duration_seconds / 120)|round(0, 'ceil')|int }} parts at 2min each
+</p>
+</div>
+{% endif %}
+</fieldset>
+
+<button type="submit" class="button" style="background: #d4a017; font-size: 18px; padding: 15px; width: 100%;">
+&#x2702; SPLIT FILE NOW
+</button>
+</form>
+
+<p class="center" style="font-size: 12px; margin-top: 10px; color: #666;">
+<strong>Why split?</strong> Easier to download on slow networks, can resume individual parts if interrupted
+</p>
+</div>
 
 <div class="info">
 <p class="center"><strong>Download Tips:</strong></p>
 <ul>
-<li>&#x2713; Click button above to download</li>
 <li>&#x2713; File available for 6 hours</li>
 <li>&#x2713; Works on 2G networks</li>
 <li>&#x2713; Ready for feature phones</li>
+<li>&#x2713; Split for easier downloads</li>
 </ul>
 <p class="center" style="margin-top: 10px;"><strong>Bookmark this page to download later</strong></p>
 </div>
