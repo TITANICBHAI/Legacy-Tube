@@ -559,18 +559,47 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
 
         last_error = None
         download_success = False
+        
+        # Custom user agent support
+        custom_ua = os.environ.get('CUSTOM_USER_AGENT', '')
 
         for i, strategy in enumerate(strategies):
             try:
                 if i > 0:
+                    # Exponential backoff: 1s, 3s, 9s delays (then cap at 9s for further retries)
+                    delay = min(9, 3 ** (i - 1))
                     update_status(file_id, {
                         'status': 'downloading',
-                        'progress': f'Retrying with {strategy["name"]} client... (attempt {i+1}/{len(strategies)})'
+                        'progress': f'Retrying with {strategy["name"]} client... (attempt {i+1}/{len(strategies)}, waiting {delay}s)'
                     })
-                    time.sleep(3 * i)
+                    time.sleep(delay)
 
                 # Merge strategy options with base options
                 ydl_opts = {**base_opts, **strategy['opts']}
+                
+                # Override user agent if custom one is provided
+                if custom_ua:
+                    if 'http_headers' not in ydl_opts:
+                        ydl_opts['http_headers'] = {}
+                    ydl_opts['http_headers']['User-Agent'] = custom_ua
+                    logger.info(f"Using custom user agent for {file_id}")
+                
+                # Enhanced browser headers for better mimicking
+                if 'http_headers' not in ydl_opts:
+                    ydl_opts['http_headers'] = {}
+                
+                # Add realistic browser headers if not already present
+                headers = ydl_opts['http_headers']
+                if 'DNT' not in headers:
+                    headers['DNT'] = '1'
+                if 'Sec-Fetch-Dest' not in headers:
+                    headers['Sec-Fetch-Dest'] = 'document'
+                if 'Sec-Fetch-Mode' not in headers:
+                    headers['Sec-Fetch-Mode'] = 'navigate'
+                if 'Sec-Fetch-Site' not in headers:
+                    headers['Sec-Fetch-Site'] = 'none'
+                if 'Upgrade-Insecure-Requests' not in headers:
+                    headers['Upgrade-Insecure-Requests'] = '1'
 
                 logger.info(f"Attempting download with {strategy['name']} strategy for {file_id}")
 
@@ -595,18 +624,36 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             except yt_dlp.utils.DownloadError as e:
                 last_error = str(e)
                 error_lower = last_error.lower()
-
-                # Detect IP blocking specifically
-                if '403' in last_error or 'forbidden' in error_lower or 'bot' in error_lower:
+                
+                # Detect temporary vs permanent errors for better retry logic
+                is_temporary = False
+                
+                # Temporary errors (should retry with different strategy)
+                if any(code in last_error for code in ['429', '503', '504']):
+                    is_temporary = True
+                    logger.warning(f"Temporary error {strategy['name']}: {last_error[:150]}")
+                elif 'timeout' in error_lower or 'timed out' in error_lower:
+                    is_temporary = True
+                    logger.warning(f"Timeout with {strategy['name']}: {last_error[:150]}")
+                
+                # Permanent errors (less likely to succeed with retry)
+                elif any(code in last_error for code in ['404', '410']):
+                    logger.error(f"Permanent error {strategy['name']}: Video not found or deleted")
+                    # Don't retry for permanent errors
+                    break
+                
+                # IP blocking / bot detection
+                elif '403' in last_error or 'forbidden' in error_lower or 'bot' in error_lower:
                     logger.warning(f"⚠️ Possible IP block detected with {strategy['name']}: {last_error[:200]}")
                     # Add extra delay when IP blocked
                     time.sleep(5)
                 else:
-                    logger.error(f"{strategy['name']} download error for {file_id}: {last_error}")
+                    logger.error(f"{strategy['name']} download error for {file_id}: {last_error[:200]}")
+                
                 continue
             except Exception as e:
                 last_error = str(e)
-                logger.error(f"{strategy['name']} unexpected error for {file_id}: {last_error}")
+                logger.error(f"{strategy['name']} unexpected error for {file_id}: {last_error[:200]}")
                 continue
 
         if not download_success:
@@ -976,6 +1023,73 @@ def favicon():
 @app.route('/health')
 def health():
     return {'status': 'ok', 'service': 'youtube-3gp-converter'}, 200
+
+@app.route('/history')
+def history():
+    """Show download history of recent conversions (last 48 hours)"""
+    status_data = get_status()
+    
+    # Filter for files from last 48 hours
+    cutoff_time = datetime.now() - timedelta(hours=48)
+    history_items = []
+    
+    for file_id, data in status_data.items():
+        try:
+            # Get timestamp
+            timestamp_str = data.get('timestamp') or data.get('completed_at')
+            if not timestamp_str:
+                continue
+            
+            file_time = datetime.fromisoformat(timestamp_str)
+            if file_time < cutoff_time:
+                continue
+            
+            # Determine file format
+            file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+            file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
+            
+            format_type = None
+            file_exists = False
+            file_size = 0
+            
+            if os.path.exists(file_path_3gp):
+                format_type = '3GP'
+                file_exists = True
+                file_size = os.path.getsize(file_path_3gp)
+            elif os.path.exists(file_path_mp3):
+                format_type = 'MP3'
+                file_exists = True
+                file_size = os.path.getsize(file_path_mp3)
+            
+            # Calculate expiry time
+            expiry_time = None
+            time_remaining = None
+            if data.get('completed_at'):
+                completed_at = datetime.fromisoformat(data['completed_at'])
+                expiry_time = completed_at + timedelta(hours=FILE_RETENTION_HOURS)
+                time_remaining = expiry_time - datetime.now()
+            
+            history_items.append({
+                'file_id': file_id,
+                'title': data.get('video_title', 'Unknown'),
+                'url': data.get('url', ''),
+                'format': format_type,
+                'status': data.get('status', 'unknown'),
+                'file_exists': file_exists,
+                'file_size': file_size,
+                'file_size_mb': f"{file_size / (1024 * 1024):.2f}" if file_size > 0 else "0",
+                'timestamp': file_time,
+                'expiry_time': expiry_time,
+                'time_remaining': time_remaining
+            })
+        except Exception as e:
+            logger.warning(f"Error processing history item {file_id}: {e}")
+            continue
+    
+    # Sort by timestamp (newest first)
+    history_items.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return render_template('history.html', history_items=history_items)
 
 @app.route('/convert', methods=['POST'])
 def convert():
