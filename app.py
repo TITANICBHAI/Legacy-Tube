@@ -100,39 +100,39 @@ MP3_QUALITY_PRESETS = {
 }
 
 # Quality presets for 3GP video conversion
-# Note: All presets use consistent audio (24kbps AAC, 16kHz) for feature phone compatibility
+# Note: Updated with higher audio bitrates for better quality
 VIDEO_QUALITY_PRESETS = {
     'ultralow': {
         'name': 'Ultra Low (2G Networks)',
         'video_bitrate': '150k',
-        'audio_bitrate': '24k',
-        'audio_sample_rate': '16000',
+        'audio_bitrate': '128k',
+        'audio_sample_rate': '44100',
         'fps': '10',
-        'description': '~1 MB per 5 min'
+        'description': '~2 MB per 5 min'
     },
     'low': {
         'name': 'Low (Recommended for Feature Phones)',
         'video_bitrate': '200k',
-        'audio_bitrate': '24k',
-        'audio_sample_rate': '16000',
+        'audio_bitrate': '192k',
+        'audio_sample_rate': '44100',
         'fps': '12',
-        'description': '~2 MB per 5 min'
+        'description': '~3 MB per 5 min'
     },
     'medium': {
         'name': 'Medium (Better Quality)',
         'video_bitrate': '300k',
-        'audio_bitrate': '24k',
-        'audio_sample_rate': '16000',
+        'audio_bitrate': '192k',
+        'audio_sample_rate': '44100',
         'fps': '15',
-        'description': '~2.5 MB per 5 min'
+        'description': '~4 MB per 5 min'
     },
     'high': {
         'name': 'High (Best Quality)',
         'video_bitrate': '400k',
-        'audio_bitrate': '24k',
-        'audio_sample_rate': '16000',
+        'audio_bitrate': '320k',
+        'audio_sample_rate': '48000',
         'fps': '20',
-        'description': '~3 MB per 5 min'
+        'description': '~5 MB per 5 min'
     }
 }
 
