@@ -6,6 +6,8 @@ import json
 import signal
 import sys
 import logging
+import secrets
+import re
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
@@ -19,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SESSION_SECRET', 'dev-secret-key-change-in-production')
+app.secret_key = os.environ.get('SESSION_SECRET', secrets.token_hex(32))
 
 @app.after_request
 def add_cache_control_headers(response):
@@ -98,38 +100,39 @@ MP3_QUALITY_PRESETS = {
 }
 
 # Quality presets for 3GP video conversion
+# Note: All presets use consistent audio (24kbps AAC, 16kHz) for feature phone compatibility
 VIDEO_QUALITY_PRESETS = {
     'ultralow': {
         'name': 'Ultra Low (2G Networks)',
         'video_bitrate': '150k',
-        'audio_bitrate': '128k',
-        'audio_sample_rate': '44100',
+        'audio_bitrate': '24k',
+        'audio_sample_rate': '16000',
         'fps': '10',
-        'description': '~2.3 MB per 5 min'
+        'description': '~1 MB per 5 min'
     },
     'low': {
         'name': 'Low (Recommended for Feature Phones)',
         'video_bitrate': '200k',
-        'audio_bitrate': '192k',
-        'audio_sample_rate': '44100',
+        'audio_bitrate': '24k',
+        'audio_sample_rate': '16000',
         'fps': '12',
-        'description': '~3.2 MB per 5 min'
+        'description': '~2 MB per 5 min'
     },
     'medium': {
         'name': 'Medium (Better Quality)',
         'video_bitrate': '300k',
-        'audio_bitrate': '256k',
-        'audio_sample_rate': '44100',
+        'audio_bitrate': '24k',
+        'audio_sample_rate': '16000',
         'fps': '15',
-        'description': '~4.6 MB per 5 min'
+        'description': '~2.5 MB per 5 min'
     },
     'high': {
         'name': 'High (Best Quality)',
         'video_bitrate': '400k',
-        'audio_bitrate': '320k',
-        'audio_sample_rate': '48000',
-        'fps': '18',
-        'description': '~6 MB per 5 min'
+        'audio_bitrate': '24k',
+        'audio_sample_rate': '16000',
+        'fps': '20',
+        'description': '~3 MB per 5 min'
     }
 }
 
@@ -574,6 +577,13 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 # Use yt-dlp Python API instead of subprocess
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info_dict = ydl.extract_info(url, download=True)
+                    
+                    # Save video title for better download filenames
+                    if info_dict and 'title' in info_dict:
+                        video_title = info_dict.get('title', 'video')
+                        # Sanitize the title for use as a filename
+                        video_title = re.sub(r'[<>:"/\\|?*]', '_', video_title)[:50]  # Limit length
+                        update_status(file_id, {'video_title': video_title})
 
                 if os.path.exists(temp_video) and os.path.getsize(temp_video) > 0:
                     logger.info(f"Download successful with {strategy['name']} for {file_id}")
@@ -674,6 +684,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             })
 
             # MP3 conversion with quality preset
+            # All presets use stereo (2 channels) as described in the preset descriptions
             convert_cmd = [
                 FFMPEG_PATH,
                 '-i', temp_video,
@@ -681,7 +692,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-acodec', 'libmp3lame',
                 '-ar', quality_preset['sample_rate'],  # Sample rate from preset
                 '-b:a', quality_preset['bitrate'],  # Bitrate from preset
-                '-ac', '2' if quality in ['veryhigh', 'extreme'] else '1',  # Stereo for high quality, mono otherwise
+                '-ac', '2',  # Stereo for all presets (matches preset descriptions)
                 '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
                 '-compression_level', '2',  # Faster encoding for web server
                 '-threads', '1',
@@ -767,16 +778,16 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 if os.path.exists(temp_video):
                     try:
                         os.remove(temp_video)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Could not remove temp file {temp_video}: {e}")
                 raise Exception(f"Conversion failed after retry: {error_msg}")
 
         # Clean up temp video after successful conversion
         if os.path.exists(temp_video):
             try:
                 os.remove(temp_video)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Could not remove temp file {temp_video}: {e}")
 
         if not os.path.exists(output_path):
             raise Exception("Conversion failed: Output file not created")
@@ -805,8 +816,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
         if os.path.exists(temp_video):
             try:
                 os.remove(temp_video)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Could not remove temp file {temp_video}: {e}")
     except Exception as e:
         logger.error(f"Error processing {file_id}: {str(e)}")
         update_status(file_id, {
@@ -816,15 +827,15 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
         if os.path.exists(temp_video):
             try:
                 os.remove(temp_video)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Could not remove temp file {temp_video}: {e}")
 
         # Cleanup output if partially created
         if os.path.exists(output_path):
             try:
                 os.remove(output_path)
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Could not remove output file {output_path}: {e}")
 
 def cleanup_old_files():
     while True:
@@ -868,9 +879,20 @@ def cleanup_old_files():
                             if os.path.exists(file_path_mp3):
                                 os.remove(file_path_mp3)
                                 deleted_count += 1
+                            
+                            # Also delete any split parts for this file_id
+                            for filename in os.listdir(DOWNLOAD_FOLDER):
+                                if filename.startswith(f'{file_id}_part'):
+                                    part_path = os.path.join(DOWNLOAD_FOLDER, filename)
+                                    try:
+                                        os.remove(part_path)
+                                        deleted_count += 1
+                                    except Exception as e:
+                                        logger.warning(f"Could not remove split part {filename}: {e}")
+                            
                             del status[file_id]
                     except Exception as e:
-                        print(f"Error cleaning file {file_id}: {e}")
+                        logger.error(f"Error cleaning file {file_id}: {e}")
                         continue
 
                 temp_file = STATUS_FILE + '.tmp'
@@ -887,33 +909,33 @@ def cleanup_old_files():
                             os.remove(file_path)
                             deleted_count += 1
                 except Exception as e:
-                    print(f"Error removing orphan file {filename}: {e}")
+                    logger.error(f"Error removing orphan file {filename}: {e}")
                     continue
 
             if deleted_count > 0:
-                print(f"Cleanup completed: Deleted {deleted_count} old files")
+                logger.info(f"Cleanup completed: Deleted {deleted_count} old files")
 
         except Exception as e:
-            print(f"Cleanup error: {e}")
+            logger.error(f"Cleanup error: {e}")
 
 cleanup_thread = threading.Thread(target=cleanup_old_files, daemon=True)
 cleanup_thread.start()
 
 def signal_handler(sig, frame):
-    print(f'\nReceived signal {sig}. Gracefully shutting down...')
-    print('Cleaning up temporary files...')
+    logger.info(f'\nReceived signal {sig}. Gracefully shutting down...')
+    logger.info('Cleaning up temporary files...')
     try:
         for filename in os.listdir(DOWNLOAD_FOLDER):
             file_path = os.path.join(DOWNLOAD_FOLDER, filename)
             if os.path.isfile(file_path) and filename.endswith('_temp.mp4'):
                 try:
                     os.remove(file_path)
-                    print(f'Cleaned up temp file: {filename}')
-                except:
-                    pass
-    except:
-        pass
-    print('Shutdown complete.')
+                    logger.info(f'Cleaned up temp file: {filename}')
+                except Exception as e:
+                    logger.warning(f'Could not remove temp file {filename}: {e}')
+    except Exception as e:
+        logger.error(f'Error during cleanup: {e}')
+    logger.info('Shutdown complete.')
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, signal_handler)
@@ -1008,11 +1030,16 @@ def download(file_id):
     # Check for both 3gp and mp3 files
     file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
     file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
+    
+    # Get video title from status for better filename
+    status_data = get_status()
+    file_status = status_data.get(file_id, {})
+    video_title = file_status.get('video_title', 'video')
 
     if os.path.exists(file_path_3gp):
-        return send_file(file_path_3gp, as_attachment=True, download_name=f'video_{file_id}.3gp')
+        return send_file(file_path_3gp, as_attachment=True, download_name=f'{video_title}.3gp')
     elif os.path.exists(file_path_mp3):
-        return send_file(file_path_mp3, as_attachment=True, download_name=f'audio_{file_id}.mp3')
+        return send_file(file_path_mp3, as_attachment=True, download_name=f'{video_title}.mp3')
     else:
         flash('File not found or has been deleted')
         return redirect(url_for('index'))
@@ -1302,7 +1329,6 @@ def split_downloads(file_id):
         if filename.startswith(f'{file_id}_part'):
             part_path = os.path.join(DOWNLOAD_FOLDER, filename)
             # Extract part number
-            import re
             match = re.search(r'part(\d+)', filename)
             part_num = int(match.group(1)) if match else 0
             
@@ -1326,7 +1352,17 @@ def split_downloads(file_id):
 @app.route('/download_part/<filename>')
 def download_part(filename):
     """Download a specific split part"""
+    # Prevent path traversal attacks - only allow safe filenames
+    if '..' in filename or '/' in filename or '\\' in filename:
+        flash('Invalid filename')
+        return redirect(url_for('index'))
+    
     file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+    
+    # Double-check the resolved path is still within DOWNLOAD_FOLDER
+    if not os.path.abspath(file_path).startswith(os.path.abspath(DOWNLOAD_FOLDER)):
+        flash('Invalid file path')
+        return redirect(url_for('index'))
     
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True, download_name=filename)
