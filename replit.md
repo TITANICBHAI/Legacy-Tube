@@ -59,6 +59,15 @@ The application features ultra-lightweight HTML templates designed for feature p
     - **Emergency Cleanup**: Automatic cleanup when space drops below threshold
     - **Pre-download Checks**: Validates sufficient space before starting
     - **Configurable Thresholds**: Alert when free space < 1.5GB (configurable)
+- **File Splitting** (NEW - Nov 2025): Advanced file splitting for easier downloads on 2G networks:
+    - **Split by Number of Parts**: Divide files into equal-sized parts (2-100 parts)
+    - **Split by Size**: Split files by specifying size per part (0.1MB - 1000MB)
+    - **Split by Duration**: Split videos by time duration (for 3GP videos only)
+    - **Sequential Numbering**: Parts numbered as file_id_part1.ext, file_id_part2.ext, etc.
+    - **Auto-generated Join Commands**: Dynamic Windows/Mac/Linux commands with actual filenames
+    - **Smart Validation**: Prevents zero-byte parts, validates against file size
+    - **File Info Display**: Shows file size, duration, and format before splitting
+    - **Feature Phone Friendly**: Large buttons, clear instructions, no JavaScript required
 
 ### System Design Choices
 - **Stateless Design**: Uses temporary file storage and a simple JSON file for status tracking instead of a traditional database, making it suitable for lightweight deployments.
@@ -68,8 +77,11 @@ The application features ultra-lightweight HTML templates designed for feature p
 ### Core Routes
 - `GET /`: Homepage for URL input.
 - `POST /convert`: Initiates video conversion.
-- `GET /status/<file_id>`: Displays conversion progress.
-- `GET /download/<file_id>`: Serves the converted 3GP file.
+- `GET /status/<file_id>`: Displays conversion progress and file splitting options.
+- `GET /download/<file_id>`: Serves the converted 3GP/MP3 file.
+- `POST /split/<file_id>`: Splits file into parts (by number, size, or duration).
+- `GET /split_downloads/<file_id>`: Shows download links for all split parts.
+- `GET /download_part/<filename>`: Downloads a specific split part.
 - `GET /search` & `POST /search`: YouTube search interface (no API key required).
 - `GET /cookies` & `POST /cookies`: Interface for managing YouTube authentication cookies.
 - `GET /health`: Health check endpoint.
@@ -90,7 +102,17 @@ The application features ultra-lightweight HTML templates designed for feature p
 
 ## Recent Updates
 
-### November 2, 2025 (Latest Update)
+### November 5, 2025 (Latest Update)
+- ✅ **NEW**: File splitting feature for easier 2G downloads - split files by parts, size, or duration
+- ✅ **NEW**: File info display on completion page (size, duration, format)
+- ✅ **NEW**: Auto-generated join commands with actual filenames for Windows/Mac/Linux
+- ✅ **NEW**: Sequential part numbering (part1, part2, part3...) for easy tracking
+- ✅ **NEW**: Smart validation prevents zero-byte parts and impossible split requests
+- ✅ **NEW**: Duration-based splitting for 3GP videos (split by minutes)
+- ✅ **NEW**: Feature phone friendly split UI with large buttons and clear instructions
+- ✅ **NEW**: Split downloads page showing all parts with individual download links
+
+### November 2, 2025
 - ✅ **NEW**: Updated High 3GP quality to 18 fps (was 15 fps) for smoother playback
 - ✅ **NEW**: Upgraded YouTube blocking prevention with 2025 user agents (iOS 18.1, Android 14)
 - ✅ **NEW**: Added Android TV download strategy for better reliability
