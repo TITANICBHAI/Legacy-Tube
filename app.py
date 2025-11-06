@@ -1426,7 +1426,7 @@ def split_video_by_duration(file_path, duration_seconds, file_id):
         ]
         
         try:
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300000)
             if result.returncode == 0 and os.path.exists(part_path):
                 parts.append({
                     'filename': part_filename,
@@ -1590,7 +1590,7 @@ def search():
             'no_warnings': True,
             'extract_flat': True,
             'force_generic_extractor': False,
-            'socket_timeout': 30,  # Timeout for 2G networks
+            'socket_timeout': 300,  # Timeout for 2G networks
         }
 
         # Add cookies if available (helps with rate limiting and bot detection)
