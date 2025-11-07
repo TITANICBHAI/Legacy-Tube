@@ -1504,6 +1504,97 @@ def download_part(filename):
         flash('File part not found or has been deleted')
         return redirect(url_for('index'))
 
+@app.route('/split_tool', methods=['GET', 'POST'])
+def split_tool():
+    """Dedicated page for splitting downloaded files"""
+    if request.method == 'POST':
+        # Handle split request
+        file_id = request.form.get('file_id', '').strip()
+        num_parts_str = request.form.get('num_parts', '').strip()
+        
+        # Validate inputs
+        if not file_id:
+            flash('Invalid file selected')
+            return redirect(url_for('split_tool'))
+        
+        # Safely parse num_parts
+        try:
+            num_parts = int(num_parts_str)
+        except (ValueError, TypeError):
+            flash('Please enter a valid number of parts (2-50)')
+            return redirect(url_for('split_tool'))
+        
+        # Validate range
+        if num_parts < 2 or num_parts > 50:
+            flash('Number of parts must be between 2 and 50')
+            return redirect(url_for('split_tool'))
+        
+        # Find the file - sanitize file_id to prevent path traversal
+        if '..' in file_id or '/' in file_id or '\\' in file_id:
+            flash('Invalid file ID')
+            return redirect(url_for('split_tool'))
+        
+        file_path_3gp = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.3gp')
+        file_path_mp3 = os.path.join(DOWNLOAD_FOLDER, f'{file_id}.mp3')
+        
+        file_path = None
+        if os.path.exists(file_path_3gp):
+            file_path = file_path_3gp
+        elif os.path.exists(file_path_mp3):
+            file_path = file_path_mp3
+        else:
+            flash('File not found or has been deleted')
+            return redirect(url_for('split_tool'))
+        
+        # Verify resolved path is within DOWNLOAD_FOLDER
+        if not os.path.abspath(file_path).startswith(os.path.abspath(DOWNLOAD_FOLDER)):
+            flash('Invalid file path')
+            return redirect(url_for('split_tool'))
+        
+        try:
+            # Split with proper re-encoding for feature phones
+            flash('Splitting file... This may take a few minutes as each part is being properly encoded for feature phone compatibility.')
+            parts = split_media_file(file_path, num_parts, file_id)
+            
+            if parts:
+                flash(f'File split into {len(parts)} parts successfully! Each part has been properly encoded and will play on feature phones.')
+                return redirect(url_for('split_downloads', file_id=file_id))
+            else:
+                flash('Failed to split file. Please try with fewer parts or check the logs.')
+                return redirect(url_for('split_tool'))
+        except Exception as e:
+            logger.error(f"Error splitting file: {str(e)}")
+            flash('An error occurred while splitting the file.')
+            return redirect(url_for('split_tool'))
+    
+    # GET request - show available files
+    files = []
+    for filename in os.listdir(DOWNLOAD_FOLDER):
+        # Only show main files, not split parts
+        if filename.endswith('.3gp') or filename.endswith('.mp3'):
+            if '_part' not in filename:  # Skip already split parts
+                file_path = os.path.join(DOWNLOAD_FOLDER, filename)
+                file_id = os.path.splitext(filename)[0]
+                
+                # Get file info
+                info = get_file_info(file_path)
+                
+                files.append({
+                    'filename': filename,
+                    'file_id': file_id,
+                    'size': os.path.getsize(file_path),
+                    'size_human': info['size_human'],
+                    'size_mb': info['size_mb'],
+                    'format': info['format'],
+                    'duration_human': info['duration_human'],
+                    'duration_seconds': info['duration_seconds']
+                })
+    
+    # Sort by newest first (based on filename which contains timestamp hash)
+    files.sort(key=lambda x: x['filename'], reverse=True)
+    
+    return render_template('split_tool.html', files=files)
+
 @app.route('/search', methods=['GET', 'POST'])
 def search():
     # Check if showing thumbnails (default: no, to save data on 2G)
