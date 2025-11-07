@@ -50,8 +50,8 @@ def parse_filesize(size_str):
     return int(size_str)
 
 MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 2 * 3600))  # 2 hours for Render free tier
-DOWNLOAD_TIMEOUT = int(os.environ.get('DOWNLOAD_TIMEOUT', 1800))  # 30 min max download
-CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT', 3600))  # 1 hour max conversion
+DOWNLOAD_TIMEOUT = None  # No timeout for downloads
+CONVERSION_TIMEOUT = None  # No timeout for conversions
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
 MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '500M'))  # 500MB for Render free tier (2GB /tmp total)
 
@@ -859,7 +859,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 output_path
             ]
 
-        dynamic_timeout = max(CONVERSION_TIMEOUT, int(duration * 2))
+        dynamic_timeout = None  # No timeout for conversions
         result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
 
         if result.returncode != 0:
@@ -1382,7 +1382,7 @@ def split_media_file(file_path, num_parts, file_id):
         
         try:
             logger.info(f"Creating part {part_num}/{num_parts} from {start_time}s to {start_time + part_duration}s...")
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=600)
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=None)
             
             if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
                 parts.append({
