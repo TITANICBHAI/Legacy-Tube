@@ -64,6 +64,26 @@ The application features ultra-lightweight HTML templates with no JavaScript, op
 
 ## Recent Changes
 
+### November 2025 - Feature Phone Splitting Fix
+- **Critical Fix**: Replaced broken binary splitting with proper FFmpeg re-encoding for feature phone compatibility
+- **Audio Codec Fix**: Changed 3GP split audio from MP3 to AMR-NB (Adaptive Multi-Rate Narrowband) - the standard codec for feature phones
+- **Split Implementation**: 
+  - Removed `split_file_by_parts` and `split_file_by_size` binary splitting (created corrupt files)
+  - Implemented `split_media_file()` with proper re-encoding for each part
+  - 3GP parts: H.263 video (176x144, 64kbps, 15fps) + AMR-NB audio (12.2kbps, 8kHz, mono)
+  - MP3 parts: libmp3lame (128kbps, 44.1kHz, stereo)
+  - Each part is a complete, standalone playable file with proper headers and keyframes
+- **UI Improvements**:
+  - Simplified splitting interface (removed confusing "by size" and "by duration" options)
+  - Added clear messaging about re-encoding time expectations
+  - Limited parts to 2-50 (was 2-100) for better reliability
+- **New Feature**: Dedicated `/split_tool` page for splitting already-downloaded files
+  - Shows all available MP3 and 3GP files
+  - File info display (size, duration, format)
+  - Added [Split] link in navigation
+  - Robust error handling and input validation
+  - Path traversal protection and security hardening
+
 ### November 2025 - Cookie-Less Cloud Hosting Improvements
 - **Purpose**: Make app work reliably WITHOUT cookies on Render free tier, since feature phone users can't easily upload cookies
 - **Download Strategies**: Expanded from 4 to 7 methods, adding Android Embedded, TV Embedded, Web Embedded, and Media Connect clients
