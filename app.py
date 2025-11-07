@@ -1296,152 +1296,116 @@ def get_file_info(file_path):
     
     return info
 
-def split_file_by_parts(file_path, num_parts, file_id):
-    """Split file into specified number of parts"""
+def split_media_file(file_path, num_parts, file_id):
+    """
+    Split media file (MP3 or 3GP) into specified number of parts with proper re-encoding.
+    This ensures each part is a complete, playable media file compatible with feature phones.
+    """
     if not os.path.exists(file_path):
         return None
     
-    file_size = os.path.getsize(file_path)
-    
-    # Validate: prevent zero-byte parts
-    if num_parts > file_size:
-        logger.warning(f"num_parts ({num_parts}) exceeds file size ({file_size} bytes), capping to file size")
-        num_parts = max(2, file_size)  # At least 2 parts, at most 1 byte per part
-    
-    part_size = file_size // num_parts
-    
-    # Additional safety: ensure part_size is at least 1 byte
-    if part_size < 1:
-        part_size = 1
-        num_parts = file_size
-    
-    ext = os.path.splitext(file_path)[1]
-    parts = []
-    
-    with open(file_path, 'rb') as f:
-        for i in range(num_parts):
-            part_filename = f"{file_id}_part{i+1}{ext}"
-            part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
-            
-            # Read the chunk for this part
-            if i == num_parts - 1:
-                # Last part gets all remaining bytes
-                chunk = f.read()
-            else:
-                chunk = f.read(part_size)
-            
-            # Skip empty chunks
-            if not chunk:
-                break
-            
-            with open(part_path, 'wb') as part_file:
-                part_file.write(chunk)
-            
-            parts.append({
-                'filename': part_filename,
-                'path': part_path,
-                'size': len(chunk),
-                'part_num': i + 1
-            })
-    
-    # Verify all parts are non-zero
-    valid_parts = []
-    for part in parts:
-        if part['size'] > 0:
-            valid_parts.append(part)
-        else:
-            # Clean up zero-byte file
-            if os.path.exists(part['path']):
-                os.remove(part['path'])
-            logger.warning(f"Removed zero-byte part: {part['filename']}")
-    
-    return valid_parts if len(valid_parts) > 0 else None
-
-def split_file_by_size(file_path, size_mb, file_id):
-    """Split file into parts of specified size (in MB)"""
-    if not os.path.exists(file_path):
-        return None
-    
-    file_size = os.path.getsize(file_path)
-    part_size = int(size_mb * 1024 * 1024)  # Convert MB to bytes
-    
-    ext = os.path.splitext(file_path)[1]
-    parts = []
-    part_num = 1
-    
-    with open(file_path, 'rb') as f:
-        while True:
-            chunk = f.read(part_size)
-            if not chunk:
-                break
-            
-            part_filename = f"{file_id}_part{part_num}{ext}"
-            part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
-            
-            with open(part_path, 'wb') as part_file:
-                part_file.write(chunk)
-            
-            parts.append({
-                'filename': part_filename,
-                'path': part_path,
-                'size': len(chunk),
-                'part_num': part_num
-            })
-            
-            part_num += 1
-    
-    return parts
-
-def split_video_by_duration(file_path, duration_seconds, file_id):
-    """Split video into parts of specified duration (in seconds) using ffmpeg"""
-    if not os.path.exists(file_path):
-        return None
-    
-    ext = os.path.splitext(file_path)[1]
-    parts = []
-    part_num = 1
-    start_time = 0
+    ext = os.path.splitext(file_path)[1].lower()
     
     # Get total duration
     info = get_file_info(file_path)
     total_duration = info['duration_seconds']
     
     if total_duration == 0:
-        logger.warning(f"Could not get duration for video split: {file_path}")
+        logger.warning(f"Could not get duration for media split: {file_path}")
         return None
     
-    while start_time < total_duration:
+    # Calculate duration per part
+    duration_per_part = total_duration / num_parts
+    
+    # Minimum 10 seconds per part
+    if duration_per_part < 10:
+        logger.warning(f"Parts would be too short ({duration_per_part}s), adjusting...")
+        num_parts = max(2, int(total_duration / 10))
+        duration_per_part = total_duration / num_parts
+    
+    parts = []
+    part_num = 1
+    start_time = 0
+    
+    logger.info(f"Splitting {file_path} into {num_parts} parts (each ~{int(duration_per_part)}s)")
+    
+    while start_time < total_duration and part_num <= num_parts:
         part_filename = f"{file_id}_part{part_num}{ext}"
         part_path = os.path.join(DOWNLOAD_FOLDER, part_filename)
         
-        # Use ffmpeg to extract segment
-        ffmpeg_cmd = [
-            FFMPEG_PATH,
-            '-i', file_path,
-            '-ss', str(start_time),
-            '-t', str(duration_seconds),
-            '-c', 'copy',  # Copy without re-encoding for speed
-            '-y',  # Overwrite output file
-            part_path
-        ]
+        # Calculate actual duration for this part (last part gets remaining time)
+        if part_num == num_parts:
+            part_duration = total_duration - start_time
+        else:
+            part_duration = duration_per_part
+        
+        # Build FFmpeg command with proper re-encoding for feature phones
+        if ext == '.mp3':
+            # MP3 audio: re-encode with simple, compatible settings
+            ffmpeg_cmd = [
+                FFMPEG_PATH,
+                '-ss', str(start_time),
+                '-i', file_path,
+                '-t', str(part_duration),
+                '-c:a', 'libmp3lame',
+                '-b:a', '128k',
+                '-ar', '44100',
+                '-ac', '2',
+                '-write_xing', '0',
+                '-y',
+                part_path
+            ]
+        elif ext == '.3gp':
+            # 3GP video: re-encode with H.263 video + AMR-NB audio for maximum feature phone compatibility
+            # AMR-NB (Adaptive Multi-Rate Narrowband) is the standard audio codec for 3GP on feature phones
+            ffmpeg_cmd = [
+                FFMPEG_PATH,
+                '-ss', str(start_time),
+                '-i', file_path,
+                '-t', str(part_duration),
+                '-c:v', 'h263',
+                '-s', '176x144',
+                '-b:v', '64k',
+                '-r', '15',
+                '-g', '15',
+                '-c:a', 'libopencore_amrnb',
+                '-b:a', '12.2k',
+                '-ar', '8000',
+                '-ac', '1',
+                '-f', '3gp',
+                '-y',
+                part_path
+            ]
+        else:
+            logger.error(f"Unsupported format for splitting: {ext}")
+            return None
         
         try:
-            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=300000)
-            if result.returncode == 0 and os.path.exists(part_path):
+            logger.info(f"Creating part {part_num}/{num_parts} from {start_time}s to {start_time + part_duration}s...")
+            result = subprocess.run(ffmpeg_cmd, capture_output=True, text=True, timeout=600)
+            
+            if result.returncode == 0 and os.path.exists(part_path) and os.path.getsize(part_path) > 0:
                 parts.append({
                     'filename': part_filename,
                     'path': part_path,
                     'size': os.path.getsize(part_path),
                     'part_num': part_num
                 })
+                logger.info(f"Successfully created part {part_num} ({os.path.getsize(part_path)} bytes)")
             else:
-                logger.error(f"Failed to create part {part_num}: {result.stderr}")
+                logger.error(f"Failed to create part {part_num}:")
+                logger.error(f"STDOUT: {result.stdout}")
+                logger.error(f"STDERR: {result.stderr}")
                 break
+                
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout while creating part {part_num}")
+            break
         except Exception as e:
-            logger.error(f"Error splitting video part {part_num}: {str(e)}")
+            logger.error(f"Error splitting media part {part_num}: {str(e)}")
             break
         
-        start_time += duration_seconds
+        start_time += part_duration
         part_num += 1
     
     return parts if len(parts) > 0 else None
@@ -1462,53 +1426,28 @@ def split_file(file_id):
         flash('File not found or has been deleted')
         return redirect(url_for('status', file_id=file_id))
     
-    # Get split parameters
-    split_mode = request.form.get('split_mode')  # 'parts', 'size', or 'duration'
-    
-    parts = None
-    
+    # Get number of parts requested
     try:
-        if split_mode == 'parts':
-            num_parts = int(request.form.get('num_parts', 2))
-            file_size = os.path.getsize(file_path)
-            
-            # Validate range
-            if num_parts < 2 or num_parts > 100:
-                flash('Number of parts must be between 2 and 100')
-                return redirect(url_for('status', file_id=file_id))
-            
-            # Validate against file size
-            if num_parts > file_size:
-                max_parts = max(2, file_size)
-                flash(f'File is too small to split into {num_parts} parts. Maximum {max_parts} parts for this file. Try splitting by size instead.')
-                return redirect(url_for('status', file_id=file_id))
-            
-            parts = split_file_by_parts(file_path, num_parts, file_id)
-            
-        elif split_mode == 'size':
-            size_mb = float(request.form.get('size_mb', 5))
-            if size_mb < 0.1 or size_mb > 1000:
-                flash('Part size must be between 0.1 MB and 1000 MB')
-                return redirect(url_for('status', file_id=file_id))
-            parts = split_file_by_size(file_path, size_mb, file_id)
-            
-        elif split_mode == 'duration':
-            duration_minutes = float(request.form.get('duration_minutes', 2))
-            duration_seconds = int(duration_minutes * 60)
-            if duration_seconds < 10 or duration_seconds > 36000:
-                flash('Part duration must be between 10 seconds and 10 hours')
-                return redirect(url_for('status', file_id=file_id))
-            parts = split_video_by_duration(file_path, duration_seconds, file_id)
+        num_parts = int(request.form.get('num_parts', 2))
+        
+        # Validate range
+        if num_parts < 2 or num_parts > 50:
+            flash('Number of parts must be between 2 and 50')
+            return redirect(url_for('status', file_id=file_id))
+        
+        # Split with proper re-encoding for feature phones
+        flash('Splitting file... This may take a few minutes as each part is being properly encoded for feature phone compatibility.')
+        parts = split_media_file(file_path, num_parts, file_id)
         
         if parts:
-            flash(f'File split into {len(parts)} parts successfully!')
+            flash(f'File split into {len(parts)} parts successfully! Each part has been properly encoded and will play on feature phones.')
             return redirect(url_for('split_downloads', file_id=file_id))
         else:
-            flash('Failed to split file. Please try again.')
+            flash('Failed to split file. Please try with fewer parts or check the logs.')
             return redirect(url_for('status', file_id=file_id))
             
     except ValueError as e:
-        flash('Invalid input values. Please check your numbers.')
+        flash('Invalid number of parts. Please enter a valid number.')
         return redirect(url_for('status', file_id=file_id))
     except Exception as e:
         logger.error(f"Error splitting file: {str(e)}")

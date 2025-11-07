@@ -64,55 +64,26 @@
 
 <form method="POST" action="/split/{{ file_id }}" style="margin-top: 15px;">
 <fieldset style="border: 2px solid #d4a017; padding: 10px; margin-bottom: 10px;">
-<legend style="font-weight: bold; padding: 0 5px;">Split Method:</legend>
+<legend style="font-weight: bold; padding: 0 5px;">Split into Parts:</legend>
 
-<label style="display: block; margin: 10px 0; font-size: 16px;">
-<input type="radio" name="split_mode" value="parts" checked onclick="document.getElementById('parts_input').style.display='block'; document.getElementById('size_input').style.display='none'; document.getElementById('duration_input').style.display='none';">
-<strong>By Number of Parts</strong>
-</label>
-<div id="parts_input" style="margin-left: 20px; margin-bottom: 10px;">
-<label style="font-size: 14px;">
-Number of parts (2-100):
-<input type="number" name="num_parts" value="5" min="2" max="100" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
+<div style="margin: 10px 0;">
+<label style="font-size: 14px; display: block; margin-bottom: 10px;">
+<strong>Number of parts (2-50):</strong>
+<input type="number" name="num_parts" value="5" min="2" max="50" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
 </label>
 {% if file_info %}
-<p style="font-size: 12px; color: #666; margin-top: 5px;">
-Split {{ file_info.size_human }} into equal parts
+<p style="font-size: 12px; color: #666;">
+Split {{ file_info.size_human }} file ({{ file_info.duration_human }}) into equal parts
 </p>
 {% endif %}
 </div>
 
-<label style="display: block; margin: 10px 0; font-size: 16px;">
-<input type="radio" name="split_mode" value="size" onclick="document.getElementById('parts_input').style.display='none'; document.getElementById('size_input').style.display='block'; document.getElementById('duration_input').style.display='none';">
-<strong>By Part Size (MB)</strong>
-</label>
-<div id="size_input" style="display: none; margin-left: 20px; margin-bottom: 10px;">
-<label style="font-size: 14px;">
-Size per part in MB:
-<input type="number" name="size_mb" value="2" min="0.1" max="1000" step="0.1" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
-</label>
-{% if file_info %}
-<p style="font-size: 12px; color: #666; margin-top: 5px;">
-{{ file_info.size_human }} ≈ {{ (file_info.size_mb / 2)|round(0, 'ceil')|int }} parts at 2MB each
-</p>
-{% endif %}
-</div>
-
-{% if file_info and file_info.format == '3GP' and file_info.duration_seconds > 0 %}
-<label style="display: block; margin: 10px 0; font-size: 16px;">
-<input type="radio" name="split_mode" value="duration" onclick="document.getElementById('parts_input').style.display='none'; document.getElementById('size_input').style.display='none'; document.getElementById('duration_input').style.display='block';">
-<strong>By Duration (Minutes)</strong>
-</label>
-<div id="duration_input" style="display: none; margin-left: 20px; margin-bottom: 10px;">
-<label style="font-size: 14px;">
-Minutes per part:
-<input type="number" name="duration_minutes" value="2" min="0.17" max="600" step="0.5" style="width: 80px; padding: 8px; font-size: 16px; margin-left: 5px;">
-</label>
-<p style="font-size: 12px; color: #666; margin-top: 5px;">
-{{ file_info.duration_human }} ≈ {{ (file_info.duration_seconds / 120)|round(0, 'ceil')|int }} parts at 2min each
+<div style="background: #fffacd; padding: 10px; margin-top: 10px; border: 1px solid #d4a017; border-radius: 3px;">
+<p style="font-size: 13px; font-weight: bold; margin: 0 0 5px 0; color: #8b6914;">⏱ IMPORTANT:</p>
+<p style="font-size: 12px; margin: 0; line-height: 1.4; color: #333;">
+Each part is properly re-encoded for feature phone compatibility. This takes time (a few minutes) but ensures every part plays correctly on your phone.
 </p>
 </div>
-{% endif %}
 </fieldset>
 
 <button type="submit" class="button" style="background: #d4a017; font-size: 18px; padding: 15px; width: 100%;">
@@ -121,7 +92,7 @@ Minutes per part:
 </form>
 
 <p class="center" style="font-size: 12px; margin-top: 10px; color: #666;">
-<strong>Why split?</strong> Easier to download on slow networks, can resume individual parts if interrupted
+<strong>Why split?</strong> Easier to download on slow networks, can resume individual parts if interrupted, guaranteed to work on feature phones
 </p>
 </div>
 
