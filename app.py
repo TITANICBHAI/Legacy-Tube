@@ -49,11 +49,11 @@ def parse_filesize(size_str):
             return int(float(size_str[:-1]) * multiplier)
     return int(size_str)
 
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 2 * 3600))  # 2 hours for Render free tier
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))  # 2 hours for Render free tier
 DOWNLOAD_TIMEOUT = None  # No timeout for downloads
 CONVERSION_TIMEOUT = None  # No timeout for conversions
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
-MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '500M'))  # 500MB for Render free tier (2GB /tmp total)
+MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '1000M'))  # 500MB for Render free tier (2GB /tmp total)
 
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
@@ -105,7 +105,7 @@ VIDEO_QUALITY_PRESETS = {
     'ultralow': {
         'name': 'Ultra Low (2G Networks)',
         'video_bitrate': '150k',
-        'audio_bitrate': '96k',
+        'audio_bitrate': '64k',
         'audio_sample_rate': '44100',
         'fps': '10',
         'description': '~2 MB per 5 min'
@@ -113,7 +113,7 @@ VIDEO_QUALITY_PRESETS = {
     'low': {
         'name': 'Low (Recommended for Feature Phones)',
         'video_bitrate': '200k',
-        'audio_bitrate': '192k',
+        'audio_bitrate': '128k',
         'audio_sample_rate': '44100',
         'fps': '12',
         'description': '~3 MB per 5 min'
@@ -457,10 +457,10 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             'sleep_requests': 2,  # Longer delay between requests to avoid bot detection
             'sleep_interval': 3,  # Additional sleep interval
             'max_sleep_interval': 10,  # Max random sleep to appear more human
-            'concurrent_fragment_downloads': 1,  # Sequential to avoid rate limits
+            'concurrent_fragment_downloads': 10,  # Sequential to avoid rate limits
             'ignoreerrors': False,
             'extractor_retries': 8,
-            'socket_timeout': 45,  # Longer timeout for slow cloud connections
+            'socket_timeout': 50,  # Longer timeout for slow cloud connections
             'http_chunk_size': 10485760,  # 10MB
             'quiet': False,
             'no_warnings': False,
