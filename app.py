@@ -886,7 +886,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 simple_cmd = [
                     FFMPEG_PATH,
                     '-i', temp_video,
-                    -vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
+                    '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
                     '-vcodec', 'mpeg4',
                     '-r', '15',
                     '-b:v', '200k',
@@ -1364,7 +1364,7 @@ def split_media_file(file_path, num_parts, file_id):
                 '-i', file_path,
                 '-t', str(part_duration),
                 '-c:v', 'h263',
-                -vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
+                '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
                 '-b:v', '64k',
                 '-r', '15',
                 '-g', '15',
