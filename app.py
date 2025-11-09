@@ -815,7 +815,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
                 '-compression_level', '9',  # Maximum compression (smaller files, slightly slower)
                 '-joint_stereo', '1',  # Better stereo compression (5-10% smaller)
-                '-threads', '1',
+                
                 '-y',
                 output_path
             ]
@@ -854,7 +854,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-ar', quality_preset['audio_sample_rate'],  # Audio sample rate from preset
                 '-b:a', quality_preset['audio_bitrate'],  # Audio bitrate from preset
                 '-ac', '1',
-                '-threads', '1',
+                
                 '-y',
                 output_path
             ]
@@ -878,7 +878,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                     '-ar', '16000',
                     '-b:a', '32k',
                     '-ac', '1',
-                    '-threads', '1',
+                    
                     '-y',
                     output_path
                 ]
@@ -886,15 +886,15 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 simple_cmd = [
                     FFMPEG_PATH,
                     '-i', temp_video,
-                    '-s', '176x144',
+                    -vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
                     '-vcodec', 'mpeg4',
-                    '-r', '12',
-                    '-b:v', '150k',
+                    '-r', '15',
+                    '-b:v', '200k',
                     '-acodec', 'aac',
                     '-ar', '16000',
                     '-b:a', '24k',
                     '-ac', '1',
-                    '-threads', '1',
+                    
                     '-y',
                     output_path
                 ]
@@ -1364,7 +1364,7 @@ def split_media_file(file_path, num_parts, file_id):
                 '-i', file_path,
                 '-t', str(part_duration),
                 '-c:v', 'h263',
-                '-s', '176x144',
+                -vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
                 '-b:v', '64k',
                 '-r', '15',
                 '-g', '15',
