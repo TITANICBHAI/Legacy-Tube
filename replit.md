@@ -62,7 +62,24 @@ The application features ultra-lightweight HTML templates with no JavaScript, op
 - `GET /history`: Shows download history.
 - `GET /health`: Health check.
 
+## Project Structure
+- **Root**: Core application files (app.py, Dockerfile, render.yaml, requirements.txt)
+- **templates/**: HTML templates for all pages
+- **docs/**: All documentation files (deployment guides, testing reports, etc.)
+- **Temporary storage**: `/tmp` directory for downloads, conversions, cookies, and status tracking
+
 ## Recent Changes
+
+### November 12, 2025 - Render Free Tier Optimization (0.1 vCPU)
+- **Conversion Queue System**: Implemented serialized processing to prevent concurrent FFmpeg processes from overloading 0.1 vCPU
+  - Thread-safe Queue() processes one conversion at a time
+  - Users see queue position and estimated wait times
+  - Prevents CPU throttling/crashes on Render free tier
+- **FFmpeg Settings**: Restored all high-quality encoding options (compression_level 9, trellis 2, mbd rd, cmp/subcmp 2, me_method hex)
+  - Queue prevents overload, so CPU-intensive settings are safe
+  - Conversions may be slower on 0.1 vCPU, but quality is maximized
+- **No Timeouts**: Removed all conversion timeouts to allow processing to complete regardless of duration
+- **Documentation**: Organized all .md files into `docs/` folder for cleaner project structure
 
 ### November 2025 - Feature Phone Splitting Fix
 - **Critical Fix**: Replaced broken binary splitting with proper FFmpeg re-encoding for feature phone compatibility
