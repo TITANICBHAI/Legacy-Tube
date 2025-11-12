@@ -1132,9 +1132,7 @@ def download_and_convert_internal(url, file_id, output_format='3gp', quality='au
                 'progress': f'Converting to MP3 audio ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
             })
 
-            # MP3 conversion optimized for low CPU (0.1 vCPU)
-            # Reduced compression_level from 9 to 2 (faster, still good compression)
-            # Kept joint_stereo for quality
+            # MP3 conversion with high-quality settings
             convert_cmd = [
                 FFMPEG_PATH,
                 '-i', temp_video,
@@ -1144,8 +1142,8 @@ def download_and_convert_internal(url, file_id, output_format='3gp', quality='au
                 '-b:a', quality_preset['bitrate'],  # Bitrate from preset
                 '-ac', '2',  # Stereo for all presets
                 '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
-                '-compression_level', '2',  # Lower compression (2 instead of 9) for faster encoding
-                '-joint_stereo', '1',  # Better stereo compression (minimal CPU impact)
+                '-compression_level', '9',  # Maximum compression for best quality
+                '-joint_stereo', '1',  # Better stereo compression
                 
                 '-y',
                 output_path
@@ -1156,9 +1154,7 @@ def download_and_convert_internal(url, file_id, output_format='3gp', quality='au
                 'progress': f'Converting to 3GP video ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
             })
 
-            # 3GP video conversion optimized for low CPU (0.1 vCPU)
-            # Reduced CPU-intensive options to lower values instead of removing
-            # trellis: 2->1, mbd: rd->simple, cmp/subcmp: 2->1, me_method: hex->epzs (faster)
+            # 3GP video conversion with high-quality settings
             video_bitrate_num = int(quality_preset['video_bitrate'].replace('k', ''))
             maxrate = f"{int(video_bitrate_num * 1.25)}k"  # 25% higher maxrate for better quality
             bufsize = f"{int(video_bitrate_num * 2)}k"  # Buffer size for smooth streaming
@@ -1176,13 +1172,13 @@ def download_and_convert_internal(url, file_id, output_format='3gp', quality='au
                 '-bufsize', bufsize,  # Buffer size for smooth streaming
                 '-qmin', '2',  # Minimum quantizer for better quality
                 '-qmax', '31',  # Maximum quantizer
-                '-mbd', 'simple',  # Simple mode instead of rd (less CPU)
+                '-mbd', 'rd',  # Rate-distortion optimization for best quality
                 '-flags', '+cgop',  # Closed GOP for better compression
                 '-g', str(gop_size),  # GOP size for efficient keyframe placement
-                '-trellis', '1',  # Reduced from 2 to 1 (faster, still good compression)
-                '-cmp', '1',  # Reduced from 2 to 1 (faster comparison)
-                '-subcmp', '1',  # Reduced from 2 to 1 (faster subpixel comparison)
-                '-me_method', 'epzs',  # Faster than hex, still decent quality
+                '-trellis', '2',  # Maximum trellis quantization for best quality
+                '-cmp', '2',  # Full comparison for motion estimation
+                '-subcmp', '2',  # Full subpixel comparison
+                '-me_method', 'hex',  # Hexagonal motion estimation (good quality/speed balance)
                 '-acodec', 'aac',
                 '-ar', quality_preset['audio_sample_rate'],  # Audio sample rate from preset
                 '-b:a', quality_preset['audio_bitrate'],  # Audio bitrate from preset
