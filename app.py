@@ -51,20 +51,18 @@ def parse_filesize(size_str):
             return int(float(size_str[:-1]) * multiplier)
     return int(size_str)
 
-MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))  # 2 hours for Render free tier
+MAX_VIDEO_DURATION = int(os.environ.get('MAX_VIDEO_DURATION', 10 * 3600))  # 10 hours default (configurable via env)
 DOWNLOAD_TIMEOUT = None  # No timeout for downloads
 CONVERSION_TIMEOUT = None  # No timeout for conversions
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
-MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '1000M'))  # 500MB for Render free tier (2GB /tmp total)
+MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '1000M'))  # 1GB default (2GB /tmp total on Render)
 
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
 PROXY_URL = os.environ.get('PROXY_URL', '')  # Optional: http://user:pass@proxy:port
-USE_OAUTH = os.environ.get('USE_OAUTH', 'false').lower() == 'true'
 
 # Advanced performance settings
 RATE_LIMIT_BYTES = int(os.environ.get('RATE_LIMIT_BYTES', 0))  # 0 = unlimited, set to 500000 for 500KB/s
-MAX_CONCURRENT_DOWNLOADS = int(os.environ.get('MAX_CONCURRENT_DOWNLOADS', 1))
 ENABLE_DISK_SPACE_MONITORING = os.environ.get('ENABLE_DISK_SPACE_MONITORING', 'true').lower() == 'true'
 DISK_SPACE_THRESHOLD_MB = int(os.environ.get('DISK_SPACE_THRESHOLD_MB', 1500))  # Alert when < 1.5GB free
 
@@ -133,7 +131,7 @@ VIDEO_QUALITY_PRESETS = {
         'video_bitrate': '400k',
         'audio_bitrate': '320k',
         'audio_sample_rate': '48000',
-        'fps': '20',
+        'fps': '18',
         'description': '~5 MB per 5 min'
     }
 }
@@ -309,25 +307,50 @@ def check_disk_space():
         return True, 0  # Continue anyway
 
 def clean_tmp_immediately():
-    """Emergency cleanup of /tmp when space is low"""
+    """Emergency cleanup of /tmp when space is low - retention-aware"""
     try:
         import glob
+        
+        # Get current status to avoid deleting files in active conversions
+        status = get_status()
+        active_file_ids = set()
+        
+        for file_id, data in status.items():
+            if data.get('status') in ['downloading', 'converting']:
+                active_file_ids.add(file_id)
+        
+        logger.info(f"Emergency cleanup starting. Active conversions: {len(active_file_ids)}")
 
-        # Clean downloads folder
+        # Clean downloads folder - skip files in active use
         files = glob.glob(os.path.join(DOWNLOAD_FOLDER, '*'))
         deleted = 0
         freed_mb = 0
+        skipped = 0
 
         for filepath in files:
             try:
+                filename = os.path.basename(filepath)
+                
+                # Check if this file belongs to an active conversion
+                is_active = False
+                for file_id in active_file_ids:
+                    if filename.startswith(file_id):
+                        is_active = True
+                        break
+                
+                if is_active:
+                    skipped += 1
+                    continue
+                
                 size_mb = os.path.getsize(filepath) / (1024 * 1024)
                 os.remove(filepath)
                 deleted += 1
                 freed_mb += size_mb
-            except:
+            except Exception as e:
+                logger.debug(f"Could not delete {filepath}: {e}")
                 pass
 
-        logger.info(f"Emergency cleanup: deleted {deleted} files, freed {freed_mb:.1f}MB")
+        logger.info(f"Emergency cleanup: deleted {deleted} files, freed {freed_mb:.1f}MB, skipped {skipped} active files")
         return freed_mb
     except Exception as e:
         logger.error(f"Emergency cleanup failed: {e}")
@@ -2049,7 +2072,23 @@ def cookies_page():
 
             if file and file.filename and file.filename.endswith('.txt'):
                 try:
-                    content = file.read().decode('utf-8')
+                    # Read with size limit to prevent memory exhaustion
+                    MAX_COOKIE_FILE_SIZE = 1024 * 1024  # 1MB limit for cookie files
+                    content = file.read(MAX_COOKIE_FILE_SIZE + 1)
+                    
+                    # Check if file exceeds size limit
+                    if len(content) > MAX_COOKIE_FILE_SIZE:
+                        flash('Cookie file is too large (max 1MB). Please use a valid Netscape cookie file.')
+                        return redirect(url_for('cookies_page'))
+                    
+                    # Decode content
+                    content = content.decode('utf-8')
+                    
+                    # Check line count to prevent abuse
+                    lines = content.split('\n')
+                    if len(lines) > 10000:
+                        flash('Cookie file has too many lines (max 10,000). Please use a valid cookie file.')
+                        return redirect(url_for('cookies_page'))
 
                     if 'youtube.com' not in content.lower():
                         flash('Invalid cookie file: must contain YouTube cookies')
