@@ -1,3 +1,14 @@
 Flask==3.1.2
 gunicorn==21.2.0
 yt-dlp>=2025.10.22
+email_validator
+flask
+flask-sqlalchemy
+gunicorn
+psycopg2-binary
+requests
+flask
+flask-sqlalchemy
+gunicorn
+requests
+yt-dlp
