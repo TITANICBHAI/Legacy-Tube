@@ -35,6 +35,8 @@ DOWNLOAD_FOLDER = '/tmp/downloads'
 COOKIES_FOLDER = '/tmp/cookies'
 STATUS_FILE = '/tmp/conversion_status.json'
 COOKIES_FILE = os.path.join(COOKIES_FOLDER, 'youtube_cookies.txt')
+COOKIE_METADATA_FILE = os.path.join(COOKIES_FOLDER, 'cookie_metadata.json')
+COOKIE_HEALTH_FILE = os.path.join(COOKIES_FOLDER, 'cookie_health.json')
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 os.makedirs(COOKIES_FOLDER, exist_ok=True)
 
@@ -243,6 +245,7 @@ logger.info(f"Using FFmpeg: {FFMPEG_PATH}")
 logger.info(f"Using FFprobe: {FFPROBE_PATH}")
 
 status_lock = threading.Lock()
+cookie_lock = threading.Lock()
 
 def get_status():
     with status_lock:
@@ -365,6 +368,9 @@ def validate_cookies():
 
             lines = content.strip().split('\n')
             has_youtube_cookies = False
+            has_auth_cookies = False
+            cookie_count = 0
+            important_cookies = []
 
             for line in lines:
                 if line.startswith('#') or not line.strip():
@@ -377,17 +383,193 @@ def validate_cookies():
 
                     if 'youtube.com' in domain.lower():
                         has_youtube_cookies = True
+                        cookie_count += 1
 
-                        if cookie_name in ['LOGIN_INFO', '__Secure-1PSID', '__Secure-3PSID']:
-                            return True, "Valid YouTube cookies with authentication token found"
+                        # Check for important authentication cookies
+                        if cookie_name in ['LOGIN_INFO', '__Secure-1PSID', '__Secure-3PSID', 
+                                          '__Secure-1PAPISID', '__Secure-3PAPISID', 
+                                          'SAPISID', 'APISID', 'HSID', 'SSID', 'SID']:
+                            has_auth_cookies = True
+                            important_cookies.append(cookie_name)
 
-            if has_youtube_cookies:
-                return False, "YouTube cookies found but missing LOGIN_INFO or session tokens. Please export cookies while logged into YouTube, or from a fresh youtube.com visit."
-            else:
+            if not has_youtube_cookies:
                 return False, "No YouTube cookies detected in file"
 
+            # Provide detailed validation feedback
+            if has_auth_cookies:
+                return True, f"✓ Valid YouTube cookies found ({cookie_count} cookies, including: {', '.join(important_cookies[:3])}{'...' if len(important_cookies) > 3 else ''}). These will help with age-restricted and members-only videos."
+            else:
+                # Still allow cookies without auth tokens - they can help with some videos
+                return True, f"⚠ Basic YouTube cookies found ({cookie_count} cookies) but no authentication tokens detected. This may help with some videos, but for age-restricted or members-only content, export cookies while logged into YouTube."
+
+    except UnicodeDecodeError:
+        return False, "Cookie file has invalid encoding. Please ensure it's a UTF-8 text file."
     except Exception as e:
         return False, f"Error reading cookies: {str(e)}"
+
+def get_cookie_metadata():
+    """Get metadata about uploaded cookies"""
+    with cookie_lock:
+        if os.path.exists(COOKIE_METADATA_FILE):
+            try:
+                with open(COOKIE_METADATA_FILE, 'r') as f:
+                    return json.load(f)
+            except:
+                pass
+        return {}
+
+def save_cookie_metadata(metadata):
+    """Save cookie metadata with thread-safe atomic write"""
+    with cookie_lock:
+        try:
+            temp_file = COOKIE_METADATA_FILE + '.tmp'
+            with open(temp_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            os.replace(temp_file, COOKIE_METADATA_FILE)
+        except Exception as e:
+            logger.error(f"Error saving cookie metadata: {e}")
+
+def update_cookie_health(success=True, error_msg=None):
+    """Track cookie health based on download success/failure with thread-safe atomic write"""
+    with cookie_lock:
+        health_data = {}
+        if os.path.exists(COOKIE_HEALTH_FILE):
+            try:
+                with open(COOKIE_HEALTH_FILE, 'r') as f:
+                    health_data = json.load(f)
+            except:
+                health_data = {}
+        
+        if 'total_uses' not in health_data:
+            health_data['total_uses'] = 0
+        if 'successful_uses' not in health_data:
+            health_data['successful_uses'] = 0
+        if 'failed_uses' not in health_data:
+            health_data['failed_uses'] = 0
+        if 'last_success' not in health_data:
+            health_data['last_success'] = None
+        if 'last_failure' not in health_data:
+            health_data['last_failure'] = None
+        if 'consecutive_failures' not in health_data:
+            health_data['consecutive_failures'] = 0
+        if 'recent_errors' not in health_data:
+            health_data['recent_errors'] = []
+        
+        health_data['total_uses'] += 1
+        health_data['last_used'] = datetime.now().isoformat()
+        
+        if success:
+            health_data['successful_uses'] += 1
+            health_data['last_success'] = datetime.now().isoformat()
+            health_data['consecutive_failures'] = 0
+        else:
+            health_data['failed_uses'] += 1
+            health_data['last_failure'] = datetime.now().isoformat()
+            health_data['consecutive_failures'] += 1
+            
+            if error_msg:
+                health_data['recent_errors'].append({
+                    'timestamp': datetime.now().isoformat(),
+                    'error': error_msg[:200]
+                })
+                health_data['recent_errors'] = health_data['recent_errors'][-10:]
+        
+        success_rate = (health_data['successful_uses'] / health_data['total_uses'] * 100) if health_data['total_uses'] > 0 else 0
+        health_data['success_rate'] = round(success_rate, 1)
+        
+        # Evaluate status from worst to best (dead > failing > degraded > healthy)
+        health_data['status'] = 'healthy'
+        if health_data['consecutive_failures'] >= 5:
+            health_data['status'] = 'dead'
+        elif health_data['consecutive_failures'] >= 3:
+            health_data['status'] = 'failing'
+        elif success_rate < 50 and health_data['total_uses'] >= 5:
+            health_data['status'] = 'degraded'
+        
+        try:
+            temp_file = COOKIE_HEALTH_FILE + '.tmp'
+            with open(temp_file, 'w') as f:
+                json.dump(health_data, f, indent=2)
+            os.replace(temp_file, COOKIE_HEALTH_FILE)
+        except Exception as e:
+            logger.error(f"Error saving cookie health: {e}")
+        
+        return health_data
+
+def get_cookie_health():
+    """Get current cookie health status with thread-safe read"""
+    with cookie_lock:
+        if os.path.exists(COOKIE_HEALTH_FILE):
+            try:
+                with open(COOKIE_HEALTH_FILE, 'r') as f:
+                    return json.load(f)
+            except:
+                pass
+        return None
+
+def test_cookies_live():
+    """Test cookies against YouTube to verify they work"""
+    if not has_cookies():
+        return False, "No cookies uploaded"
+    
+    try:
+        test_url = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+        
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': True,
+            'cookiefile': COOKIES_FILE,
+            'socket_timeout': 30,
+        }
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(test_url, download=False)
+            
+            if info and 'title' in info:
+                update_cookie_health(success=True)
+                return True, f"✓ Cookies working! Successfully accessed: {info.get('title', 'video')}"
+            else:
+                update_cookie_health(success=False, error_msg="Failed to extract video info")
+                return False, "Cookies may be expired - could not extract video information"
+    
+    except Exception as e:
+        error_msg = str(e)
+        update_cookie_health(success=False, error_msg=error_msg)
+        
+        if '403' in error_msg or 'forbidden' in error_msg.lower():
+            return False, "⚠ Cookies rejected by YouTube (403 Forbidden). Please upload fresh cookies."
+        elif 'sign in' in error_msg.lower() or 'login' in error_msg.lower():
+            return False, "⚠ Cookies expired or invalid. Please upload fresh cookies from an active YouTube session."
+        else:
+            return False, f"Cookie test failed: {error_msg[:150]}"
+
+def get_cookie_age_days():
+    """Get age of cookies in days since upload"""
+    metadata = get_cookie_metadata()
+    if 'upload_time' in metadata:
+        try:
+            upload_time = datetime.fromisoformat(metadata['upload_time'])
+            age = datetime.now() - upload_time
+            return age.days
+        except:
+            pass
+    return None
+
+def check_cookie_freshness():
+    """Check if cookies might be stale"""
+    age_days = get_cookie_age_days()
+    if age_days is None:
+        return "unknown", "Cookie age unknown"
+    
+    if age_days < 7:
+        return "fresh", f"Cookies are {age_days} days old (fresh)"
+    elif age_days < 30:
+        return "aging", f"Cookies are {age_days} days old (consider refreshing soon)"
+    elif age_days < 90:
+        return "old", f"Cookies are {age_days} days old (refresh recommended)"
+    else:
+        return "stale", f"Cookies are {age_days} days old (likely expired, please refresh)"
 
 def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
     # Check disk space BEFORE starting download
@@ -424,6 +606,47 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             quality = 'low'
         quality_preset = VIDEO_QUALITY_PRESETS[quality]
 
+    # Conditional cookie preflight check
+    # Only test if cookies exist AND (last success > 12h OR consecutive failures >= 2)
+    if has_cookies():
+        should_test_cookies = False
+        health = get_cookie_health()
+        
+        if health:
+            # Check if last success was over 12 hours ago
+            if health.get('last_success'):
+                try:
+                    last_success = datetime.fromisoformat(health['last_success'])
+                    hours_since_success = (datetime.now() - last_success).total_seconds() / 3600
+                    if hours_since_success > 12:
+                        should_test_cookies = True
+                        logger.info(f"Cookie preflight triggered: {hours_since_success:.1f}h since last success")
+                except:
+                    pass
+            
+            # Check for consecutive failures
+            if health.get('consecutive_failures', 0) >= 2:
+                should_test_cookies = True
+                logger.info(f"Cookie preflight triggered: {health['consecutive_failures']} consecutive failures")
+        else:
+            # No health data yet, test on first use
+            should_test_cookies = True
+            logger.info("Cookie preflight triggered: first use")
+        
+        if should_test_cookies:
+            update_status(file_id, {
+                'status': 'downloading',
+                'progress': 'Testing cookies before download...'
+            })
+            test_success, test_msg = test_cookies_live()
+            if not test_success:
+                logger.warning(f"Cookie preflight test failed: {test_msg}")
+                update_status(file_id, {
+                    'status': 'downloading',
+                    'progress': f'Cookie test warning: {test_msg}. Attempting download anyway...'
+                })
+                time.sleep(2)
+
     update_status(file_id, {
         'status': 'downloading',
         'progress': f'Downloading from YouTube for {format_name} conversion ({quality_preset["name"]})... (this may take several minutes for long videos)',
@@ -435,6 +658,39 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
     temp_video = os.path.join(DOWNLOAD_FOLDER, f'{file_id}_temp.mp4')
 
     try:
+        # Progress tracking hook for real-time download updates
+        def progress_hook(d):
+            if d['status'] == 'downloading':
+                try:
+                    percent = d.get('_percent_str', '0%').strip()
+                    speed = d.get('_speed_str', 'N/A').strip()
+                    eta = d.get('_eta_str', 'Unknown').strip()
+                    downloaded = d.get('downloaded_bytes', 0)
+                    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+                    
+                    progress_msg = f'Downloading: {percent} complete'
+                    if speed and speed != 'N/A':
+                        progress_msg += f' at {speed}'
+                    if eta and eta != 'Unknown':
+                        progress_msg += f', ETA: {eta}'
+                    
+                    update_status(file_id, {
+                        'status': 'downloading',
+                        'progress': progress_msg,
+                        'download_percent': percent,
+                        'download_speed': speed,
+                        'download_eta': eta,
+                        'downloaded_bytes': downloaded,
+                        'total_bytes': total
+                    })
+                except Exception as e:
+                    logger.debug(f"Progress hook error: {e}")
+            elif d['status'] == 'finished':
+                update_status(file_id, {
+                    'status': 'downloading',
+                    'progress': f'Download complete, preparing for {format_name} conversion...'
+                })
+        
         # Base yt-dlp options (using Python API instead of subprocess)
         # Use flexible format selection to avoid "Requested format not available" errors
         # Priority: smaller files for feature phones, but fallback to any available format
@@ -465,6 +721,7 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             'quiet': False,
             'no_warnings': False,
             'logger': logger,
+            'progress_hooks': [progress_hook],
         }
 
         # YouTube IP block bypass: Use IPv6 if enabled (less blocked by YouTube)
@@ -689,6 +946,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 if os.path.exists(temp_video) and os.path.getsize(temp_video) > 0:
                     logger.info(f"Download successful with {strategy['name']} for {file_id}")
                     download_success = True
+                    # Track cookie health if cookies were used
+                    if has_cookies():
+                        update_cookie_health(success=True)
                     break
                 else:
                     logger.warning(f"{strategy['name']} strategy failed - file not created or empty")
@@ -731,6 +991,10 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
         if not download_success:
             error_msg = last_error if last_error else "All download strategies failed"
             error_lower = error_msg.lower()
+            
+            # Track cookie health failure if cookies were used
+            if has_cookies():
+                update_cookie_health(success=False, error_msg=error_msg)
 
             # Optional cookie suggestion (only for specific errors where cookies definitely help)
             cookies_help = " (Optional: Upload cookies from /cookies page if this persists)" if not has_cookies() else ""
@@ -867,32 +1131,83 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
             logger.error(f"FFmpeg conversion failed for {file_id}: {error_msg}")
 
             # Retry once with simpler encoding if first attempt fails
-            logger.info(f"Retrying conversion with simpler settings for {file_id}")
+            # IMPORTANT: Respect user's quality choice - use simplified settings based on their selection
+            logger.info(f"Retrying conversion with simpler settings for {file_id} (still respecting quality choice: {quality})")
 
             if output_format == 'mp3':
+                # Calculate simplified MP3 settings based on user's quality choice
+                # Use lower complexity settings but maintain relative quality preference
+                if quality == 'extreme':
+                    # 320k -> fallback to 192k with simpler encoding
+                    retry_bitrate = '192k'
+                    retry_sample_rate = '44100'
+                    retry_channels = '2'
+                elif quality == 'veryhigh':
+                    # 256k -> fallback to 160k with simpler encoding
+                    retry_bitrate = '160k'
+                    retry_sample_rate = '44100'
+                    retry_channels = '2'
+                elif quality == 'high':
+                    # 192k -> fallback to 128k with simpler encoding
+                    retry_bitrate = '128k'
+                    retry_sample_rate = '44100'
+                    retry_channels = '2'
+                else:
+                    # 128k (medium) or auto -> fallback to 96k with simpler encoding
+                    retry_bitrate = '96k'
+                    retry_sample_rate = '44100'
+                    retry_channels = '2'
+                
                 simple_cmd = [
                     FFMPEG_PATH,
                     '-i', temp_video,
                     '-vn',
                     '-acodec', 'libmp3lame',
-                    '-ar', '16000',
-                    '-b:a', '32k',
-                    '-ac', '1',
+                    '-ar', retry_sample_rate,
+                    '-b:a', retry_bitrate,
+                    '-ac', retry_channels,
                     
                     '-y',
                     output_path
                 ]
             else:
+                # Calculate simplified 3GP settings based on user's quality choice
+                # Use simpler encoding but maintain relative quality preference
+                if quality == 'high':
+                    # High -> fallback to medium-high with simpler encoding
+                    retry_video_bitrate = '300k'
+                    retry_audio_bitrate = '192k'
+                    retry_fps = '15'
+                    retry_audio_sample_rate = '44100'
+                elif quality == 'medium':
+                    # Medium -> fallback to low-medium with simpler encoding
+                    retry_video_bitrate = '250k'
+                    retry_audio_bitrate = '128k'
+                    retry_fps = '12'
+                    retry_audio_sample_rate = '44100'
+                elif quality == 'low':
+                    # Low -> fallback to ultra-low with simpler encoding
+                    retry_video_bitrate = '150k'
+                    retry_audio_bitrate = '64k'
+                    retry_fps = '10'
+                    retry_audio_sample_rate = '44100'
+                else:
+                    # Ultra-low or auto -> fallback to minimal settings
+                    retry_video_bitrate = '128k'
+                    retry_audio_bitrate = '48k'
+                    retry_fps = '10'
+                    retry_audio_sample_rate = '44100'
+                
                 simple_cmd = [
                     FFMPEG_PATH,
                     '-i', temp_video,
                     '-vf', 'scale=176:144:force_original_aspect_ratio=decrease,pad=176:144:(ow-iw)/2:(oh-ih)/2,setsar=1',
                     '-vcodec', 'mpeg4',
-                    '-r', '15',
-                    '-b:v', '200k',
+                    '-r', retry_fps,
+                    '-b:v', retry_video_bitrate,
                     '-acodec', 'aac',
-                    '-ar', '16000',
-                    '-b:a', '24k',
+                    '-ar', retry_audio_sample_rate,
+                    '-b:a', retry_audio_bitrate,
                     '-ac', '1',
                     
                     '-y',
@@ -1749,7 +2064,19 @@ def cookies_page():
                         flash(f'Cookie validation failed: {validation_msg}')
                         return redirect(url_for('cookies_page'))
 
-                    flash('Cookies uploaded and validated successfully!')
+                    # Save cookie metadata
+                    metadata = {
+                        'upload_time': datetime.now().isoformat(),
+                        'filename': file.filename,
+                        'file_size': len(content)
+                    }
+                    save_cookie_metadata(metadata)
+                    
+                    # Reset cookie health when new cookies are uploaded
+                    if os.path.exists(COOKIE_HEALTH_FILE):
+                        os.remove(COOKIE_HEALTH_FILE)
+                    
+                    flash(f'Cookies uploaded and validated successfully! {validation_msg}')
                     return redirect(url_for('cookies_page'))
                 except Exception as e:
                     flash(f'Error uploading cookies: {str(e)}')
@@ -1762,18 +2089,42 @@ def cookies_page():
             try:
                 if os.path.exists(COOKIES_FILE):
                     os.remove(COOKIES_FILE)
-                flash('Cookies deleted successfully')
+                if os.path.exists(COOKIE_METADATA_FILE):
+                    os.remove(COOKIE_METADATA_FILE)
+                if os.path.exists(COOKIE_HEALTH_FILE):
+                    os.remove(COOKIE_HEALTH_FILE)
+                flash('Cookies and all related data deleted successfully')
             except Exception as e:
                 flash(f'Error deleting cookies: {str(e)}')
+            return redirect(url_for('cookies_page'))
+        
+        elif 'test_cookies' in request.form:
+            if not has_cookies():
+                flash('No cookies to test. Please upload cookies first.')
+            else:
+                success, test_msg = test_cookies_live()
+                if success:
+                    flash(test_msg, 'success')
+                else:
+                    flash(test_msg, 'error')
             return redirect(url_for('cookies_page'))
 
     cookies_exist = has_cookies()
     is_valid, message = validate_cookies() if cookies_exist else (False, "No cookies uploaded")
+    
+    # Get additional cookie info
+    health = get_cookie_health()
+    metadata = get_cookie_metadata()
+    freshness_status, freshness_msg = check_cookie_freshness()
 
     return render_template('cookies.html', 
                          cookies_exist=cookies_exist, 
                          is_valid=is_valid, 
-                         validation_message=message)
+                         validation_message=message,
+                         cookie_health=health,
+                         cookie_metadata=metadata,
+                         freshness_status=freshness_status,
+                         freshness_message=freshness_msg)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
