@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash
 import hashlib
 import yt_dlp
+from queue import Queue
 
 # Configure logging
 logging.basicConfig(
@@ -56,6 +57,10 @@ DOWNLOAD_TIMEOUT = None  # No timeout for downloads
 CONVERSION_TIMEOUT = None  # No timeout for conversions
 FILE_RETENTION_HOURS = int(os.environ.get('FILE_RETENTION_HOURS', 6))
 MAX_FILESIZE = parse_filesize(os.environ.get('MAX_FILESIZE', '1000M'))  # 1GB default (2GB /tmp total on Render)
+
+# Conversion queue to prevent CPU overload (process one at a time for 0.1 vCPU constraint)
+conversion_queue = Queue()
+conversion_queue_lock = threading.Lock()
 
 # YouTube IP block bypass settings
 USE_IPV6 = os.environ.get('USE_IPV6', 'false').lower() == 'true'
@@ -244,6 +249,30 @@ logger.info(f"Using FFprobe: {FFPROBE_PATH}")
 
 status_lock = threading.Lock()
 cookie_lock = threading.Lock()
+
+def conversion_worker():
+    """Worker thread that processes conversion queue one at a time"""
+    while True:
+        try:
+            # Get next conversion job from queue (blocks until available)
+            job = conversion_queue.get()
+            if job is None:  # Shutdown signal
+                break
+            
+            url, file_id, output_format, quality = job
+            logger.info(f"Processing conversion from queue: {file_id} (Queue size: {conversion_queue.qsize()})")
+            
+            # Run the actual conversion
+            download_and_convert_internal(url, file_id, output_format, quality)
+            
+            conversion_queue.task_done()
+        except Exception as e:
+            logger.error(f"Error in conversion worker: {e}")
+            conversion_queue.task_done()
+
+# Start conversion worker thread
+conversion_worker_thread = threading.Thread(target=conversion_worker, daemon=True)
+conversion_worker_thread.start()
 
 def get_status():
     with status_lock:
@@ -595,6 +624,20 @@ def check_cookie_freshness():
         return "stale", f"Cookies are {age_days} days old (likely expired, please refresh)"
 
 def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
+    """Add conversion job to queue (non-blocking)"""
+    queue_position = conversion_queue.qsize() + 1
+    
+    update_status(file_id, {
+        'status': 'queued',
+        'progress': f'Added to conversion queue (position: {queue_position})',
+        'url': url,
+        'timestamp': datetime.now().isoformat()
+    })
+    
+    conversion_queue.put((url, file_id, output_format, quality))
+    logger.info(f"Added {file_id} to conversion queue (queue size: {queue_position})")
+
+def download_and_convert_internal(url, file_id, output_format='3gp', quality='auto'):
     # Check disk space BEFORE starting download
     if ENABLE_DISK_SPACE_MONITORING:
         has_space, free_mb = check_disk_space()
@@ -1089,8 +1132,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 'progress': f'Converting to MP3 audio ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time} minute(s).'
             })
 
-            # MP3 conversion with quality preset and ENHANCED compression
-            # All presets use stereo (2 channels) as described in the preset descriptions
+            # MP3 conversion optimized for low CPU (0.1 vCPU)
+            # Reduced compression_level from 9 to 2 (faster, still good compression)
+            # Kept joint_stereo for quality
             convert_cmd = [
                 FFMPEG_PATH,
                 '-i', temp_video,
@@ -1098,10 +1142,10 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-acodec', 'libmp3lame',
                 '-ar', quality_preset['sample_rate'],  # Sample rate from preset
                 '-b:a', quality_preset['bitrate'],  # Bitrate from preset
-                '-ac', '2',  # Stereo for all presets (matches preset descriptions)
+                '-ac', '2',  # Stereo for all presets
                 '-q:a', quality_preset['vbr_quality'],  # VBR quality from preset
-                '-compression_level', '9',  # Maximum compression (smaller files, slightly slower)
-                '-joint_stereo', '1',  # Better stereo compression (5-10% smaller)
+                '-compression_level', '2',  # Lower compression (2 instead of 9) for faster encoding
+                '-joint_stereo', '1',  # Better stereo compression (minimal CPU impact)
                 
                 '-y',
                 output_path
@@ -1112,7 +1156,9 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 'progress': f'Converting to 3GP video ({quality_preset["name"]})... Duration: {duration/60:.1f} minutes, Size: {file_size_mb:.1f} MB. Estimated time: {est_time}-{est_time*2} minutes.'
             })
 
-            # 3GP video conversion with quality preset and ENHANCED compression
+            # 3GP video conversion optimized for low CPU (0.1 vCPU)
+            # Reduced CPU-intensive options to lower values instead of removing
+            # trellis: 2->1, mbd: rd->simple, cmp/subcmp: 2->1, me_method: hex->epzs (faster)
             video_bitrate_num = int(quality_preset['video_bitrate'].replace('k', ''))
             maxrate = f"{int(video_bitrate_num * 1.25)}k"  # 25% higher maxrate for better quality
             bufsize = f"{int(video_bitrate_num * 2)}k"  # Buffer size for smooth streaming
@@ -1130,13 +1176,13 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 '-bufsize', bufsize,  # Buffer size for smooth streaming
                 '-qmin', '2',  # Minimum quantizer for better quality
                 '-qmax', '31',  # Maximum quantizer
-                '-mbd', 'rd',  # Rate distortion optimization for better compression
+                '-mbd', 'simple',  # Simple mode instead of rd (less CPU)
                 '-flags', '+cgop',  # Closed GOP for better compression
                 '-g', str(gop_size),  # GOP size for efficient keyframe placement
-                '-trellis', '2',  # Trellis quantization for 10-15% smaller files
-                '-cmp', '2',  # Use hadamard comparison (better compression)
-                '-subcmp', '2',  # Subpixel comparison for better quality
-                '-me_method', 'hex',  # Fast motion estimation with good quality
+                '-trellis', '1',  # Reduced from 2 to 1 (faster, still good compression)
+                '-cmp', '1',  # Reduced from 2 to 1 (faster comparison)
+                '-subcmp', '1',  # Reduced from 2 to 1 (faster subpixel comparison)
+                '-me_method', 'epzs',  # Faster than hex, still decent quality
                 '-acodec', 'aac',
                 '-ar', quality_preset['audio_sample_rate'],  # Audio sample rate from preset
                 '-b:a', quality_preset['audio_bitrate'],  # Audio bitrate from preset
@@ -1146,7 +1192,8 @@ def download_and_convert(url, file_id, output_format='3gp', quality='auto'):
                 output_path
             ]
 
-        dynamic_timeout = None  # No timeout for conversions
+        # No timeout - let conversions run as long as needed for low CPU (0.1 vCPU)
+        dynamic_timeout = None
         result = subprocess.run(convert_cmd, capture_output=True, text=True, timeout=dynamic_timeout)
 
         if result.returncode != 0:
